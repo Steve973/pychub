@@ -1,13 +1,8 @@
-name: workflow.yml
-on:
-
-jobs:
-name: Build & Verify
+name: Build and Check
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
 
 jobs:
@@ -15,36 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install deps
-        run: pip install -U pip pytest
-
-      - name: Run tests
-        run: pytest
+      - run: pip install -U pip pytest
+      - run: pytest
 
   build:
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Build wheels and sdist
-        run: |
-          pip install build
-          python -m build
-
-      - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
@@ -54,19 +36,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Download dist artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-
-      - name: Run twine check
-        run: |
+      - run: |
           pip install twine
           twine check dist/*
