@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "pychubby"
+version = "0.1.0"
+description = "Make a Python-native .chub installer from a wheelhouse."
+authors = ["Steve Storck <steve973@gmail.com>"]
+readme = "README.md"
+packages = [
+    { include = "pychubby", from = "src" }
+]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">=3.9"
+pyyaml = "^6.0.2"
+pytest = "^8.4.1"
+
+[tool.poetry.scripts]
+pychubby = "pychubby.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
