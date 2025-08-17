@@ -416,7 +416,7 @@ metadata:
 
 - [x] Post-install hook support
 - [x] Support metadata via `.chubconfig`
-- [ ] Multiple primary wheels in a single chub
+- [x] Multiple primary wheels in a single chub
 - [ ] Digital signature support
 
 ---
