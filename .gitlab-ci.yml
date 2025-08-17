@@ -1,0 +1,42 @@
+stages:
+  - test
+  - build
+  - verify
+  - publish
+
+test:
+  stage: test
+  image: python:3.12
+  script:
+    - pip install -U pip pytest
+    - pytest
+  artifacts:
+    paths:
+      - dist/
+
+build:
+  stage: build
+  image: python:3.12
+  script:
+    - pip install -U build
+    - python -m build
+  artifacts:
+    paths:
+      - dist/
+
+verify:
+  stage: verify
+  image: python:3.12
+  script:
+    - pip install -U twine
+    - twine check dist/*
+  dependencies:
+    - build
+
+publish:
+  stage: publish
+  image: python:3.12
+  script:
+    - echo "Publishing disabled for now."
+  rules:
+    - when: never  # TODO - Enable this when testing is complete
