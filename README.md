@@ -64,7 +64,7 @@ When you run `pychubby`, it creates a structure like this:
 dist1-version/    # main wheel package directory
   libs/           # your main wheel and all dependency wheels
   scripts/        # post-install scripts
-dist2-version/  # additional wheel package directory, if present
+dist2-version/    # additional wheel package directory, if present
   libs/           # second main wheel and all dependency wheels
   scripts/        # post-install scripts
 runtime/          # bootstrap installer
