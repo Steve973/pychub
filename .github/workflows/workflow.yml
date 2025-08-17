@@ -9,24 +9,43 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -U pip pytest
-      - run: pytest
+
+      - name: Install test dependencies
+        run: pip install -U pip pytest
+
+      - name: Ensure src is on PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> $GITHUB_ENV
+
+      - name: Run unit tests
+        run: pytest
 
   build:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install build
-      - run: python -m build
-      - uses: actions/upload-artifact@v4
+
+      - name: Install build tool
+        run: pip install build
+
+      - name: Build distribution
+        run: python -m build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
@@ -35,14 +54,21 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - run: |
+
+      - name: Twine check
+        run: |
           pip install twine
           twine check dist/*
