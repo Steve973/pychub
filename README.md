@@ -115,6 +115,7 @@ dependencies into a single `.chub` file.
 | `--includes`       | `-i`       | Optional list of files to include             | 
 | `--metadata-entry` | `-m`       | Optional metadata to include in `.chubconfig` |
 | `--scripts`        | `-s`       | Optional list of post-install scripts         |
+| `--version`        | `-v`       | Show version info and exit                    |
 
 Notes:
 - `<wheel>`:
