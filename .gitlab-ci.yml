@@ -8,7 +8,7 @@ test:
   stage: test
   image: python:3.12
   script:
-    - pip install -U pip pytest
+    - pip install -U pip pytest pyyaml
     - pytest
   artifacts:
     paths:

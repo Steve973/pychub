@@ -48,12 +48,71 @@ This makes it:
 
 ---
 
-## Why not just pip install?
+## Why not just use [insert favorite tool name here]?
 
-- **Offline installs** – ship `.chub` to air-gapped systems.
-- **Reproducibility** – `.chub` contains exact wheel artifacts.
-- **No dependency download** – all wheels are included and ready to go.
-- **Controlled installation** – no risk of dependency resolution changing under your feet.
+Well, you might be right! This is not a simple question, and I will not
+presume that I can make that determination for you. You have the best knowledge
+of your use case, and that means that you are in the best position to make that
+decision.
+
+There are several really great packaging tools available for python. Many of
+them share a few overlapping capabilities, and they all have their own unique
+features that help with the use cases that they were designed to solve. Pychubby
+is no exception. It shares some features with other tools, but it was designed
+with a slightly different perspective to address particular use cases.
+
+Here is a table that might help users decide which tool is the best fit for
+their use case. (Hint: it might, or might not, be pychubby!)
+
+| Feature/Need                | pychubby                        | pex                                  | zipapp                         | PyInstaller / PyOxidizer                         |
+|-----------------------------|---------------------------------|--------------------------------------|--------------------------------|--------------------------------------------------|
+| Single-file distribution    | Yes (`.chub`)                   | Yes                                  | Yes (`.pyz`)                   | Yes (binary)                                     |
+| Includes Python interpreter | No - uses current environment   | Yes - bundled runtime                | No - uses host interpreter     | Yes - frozen binary                              |
+| Reproducible install        | Yes - exact wheel copies        | Yes - via PEX-locked deps            | Sometimes - zip structure      | No - binary blob                                 |
+| Works in venv/conda/sys env | Yes - pip into any target       | Somewhat (venv-only)                 | Yes - but ephemeral venv       | Yes – standalone embedded runtime (not reusable) |
+| Create a new venv           | Yes - ephemeral or persistent   | Yes - existing or new/ephemeral      | Yes - ephemeral                | No – uses frozen, internal environment           |
+| Post-install hooks          | Yes - run user scripts          | No (limited post setup)              | No                             | Yes - compile-time hooks                         |
+| Runtime execution           | Optional via entrypoint         | Yes                                  | Yes                            | Yes                                              |
+| Cross-platform artifact     | Yes - platform-agnostic         | Often - but not always               | Yes - but watch dependencies   | No - platform-specific                           |
+| Network-free install        | Yes - offline ready             | Yes - offline ready                  | Often - depends on config      | Yes - all-in-one                                 |
+| Target audience             | Devs shipping flexible installs | Devs deploying apps with sealed deps | Devs shipping portable scripts | Devs targeting end users                         |
+
+The table below shows how various packaging tools align with common deployment
+needs. Rather than list features, it focuses on use cases so that you can choose
+the tool that best fits your project’s real-world requirements. Each column
+reflects how well a given tool supports that scenario, whether it’s a perfect
+match, a partial fit, or better suited elsewhere.
+
+| Use Case / Scenario                              | pychubby  | pex        | zipapp    | PyInstaller / PyOxidizer |
+|--------------------------------------------------|-----------|------------|-----------|--------------------------|
+| Distribute a CLI/lib in one file                 | best fit  | best fit   | works     | overkill                 |
+| Ship sealed GUI/CLI to end users with no Python  | n/a       | n/a        | n/a       | best fit                 |
+| Run directly from compressed archive             | works     | best fit   | best fit  | n/a                      |
+| Reproducible install without network             | best fit  | best fit   | possible¹ | works                    |
+| Install into *any* Python env (sys, venv, conda) | best fit  | venv-only² | best fit  | n/a                      |
+| Include Python interpreter in artifact           | n/a       | yes        | n/a       | yes                      |
+| Use post-install scripts                         | runtime³  | n/a        | n/a       | build-time⁴              |
+| Install from wheels using pip                    | yes       | yes        | optional  | no                       |
+| Build Docker containers with no runtime pip      | best fit  | works      | works     | works                    |
+| Bundle for ephemeral one-off jobs                | works     | best fit   | best fit  | overkill                 |
+| Deploy via container without re-downloading deps | best fit  | best fit   | partial   | yes                      |
+| Target cross-platform deployment                 | yes       | partial⁵   | yes       | no                       |
+| Package with Conda dependencies                  | roadmap⁶  | n/a        | n/a       | n/a                      |
+| Support compile-time customization or setup      | limited³  | n/a        | n/a       | yes (scriptable)         |
+
+Notes:
+1. Possible: zipapps can embed dependencies, but behavior varies based on how the archive is constructed.
+2. Venv-only: PEX works best when it controls or isolates the environment; system installs are not its design goal.
+3. Runtime post-install hooks: Only pychubby supports user-defined scripts that run after install.
+4. Build-time only: PyOxidizer allows scripted setup during packaging, not at install time.
+5. Partial cross-platform: PEX artifacts must match target platforms; wheel compatibility can limit this.
+6. Planned feature: pychubby currently supports pip-based installs only. Conda support is on the potential roadmap.
+
+So the point isn’t that any of these are "best" or "wrong" tools. They’re all
+excellent for the jobs they were built for. Pychubby simply covers a different
+slice of the space: *inherently reproducible, single-file, wheel-based bundles
+that install into the current Python environment without pulling from the
+network*.
 
 ---
 
@@ -414,10 +473,14 @@ metadata:
 
 ## Roadmap
 
-- [x] Post-install hook support
-- [x] Support metadata via `.chubconfig`
-- [x] Multiple primary wheels in a single chub
-- [ ] Digital signature support
+| Status       | Feature                    | Notes                                           |
+|--------------|----------------------------|-------------------------------------------------|
+| ☐ Planned    | Pre-install hook support   | Would allow setup steps before wheel install.   |
+| ☑ Done       | Post-install hook support  | Runs user-defined scripts after installation.   |
+| ☑ Done       | Metadata via `.chubconfig` | Structured key-value metadata now supported.    |
+| ☑ Done       | Multiple primary wheels    | Each wheel has its own libs, scripts, etc.      |
+| ☐ Future     | Digital signature support  | Explore signing chub files for verification.    |
+| ☐ Exploring  | Conda support              | Evaluate creating/targeting conda environments. |
 
 ---
 
