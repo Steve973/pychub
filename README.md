@@ -1,5 +1,20 @@
 # pychubby
 
+## Table of Contents
+
+- [The Name](#the-name)
+- [Why pychubby?](#why-pychubby)
+- [Why not just use insert favorite tool name here?](#why-not-just-use-insert-favorite-tool-name-here)
+  - [Feature Comparison](#feature-comparison)
+  - [Use Case Alignment](#use-case-alignment)
+- [How it works](#how-it-works)
+- [CLI Parameters](#cli-parameters)
+  - [Building a Chub](#building-a-chub)
+  - [Operating a Chub](#operating-a-chub)
+- [The `.chubconfig` metadata file](#the-chubconfig-metadata-file)
+- [Roadmap](#roadmap)
+- [License](#license)
+
 **pychubby** is a Python packaging tool that bundles your wheel and all of its
 dependencies into a single self-extracting `.chub` file.
 
