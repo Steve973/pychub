@@ -79,6 +79,7 @@ with a slightly different perspective to address particular use cases.
 Here is a table that might help users decide which tool is the best fit for
 their use case. (Hint: it might, or might not, be pychubby!)
 
+### Feature comparison
 | Feature/Need                | pychubby                        | pex                                  | zipapp                         | PyInstaller / PyOxidizer                         |
 |-----------------------------|---------------------------------|--------------------------------------|--------------------------------|--------------------------------------------------|
 | Single-file distribution    | Yes (`.chub`)                   | Yes                                  | Yes (`.pyz`)                   | Yes (binary)                                     |
@@ -98,6 +99,7 @@ the tool that best fits your project’s real-world requirements. Each column
 reflects how well a given tool supports that scenario, whether it’s a perfect
 match, a partial fit, or better suited elsewhere.
 
+### Use case alignment
 | Use Case / Scenario                              | pychubby  | pex        | zipapp    | PyInstaller / PyOxidizer |
 |--------------------------------------------------|-----------|------------|-----------|--------------------------|
 | Distribute a CLI/lib in one file                 | best fit  | best fit   | works     | overkill                 |
