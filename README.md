@@ -31,7 +31,7 @@ Optionally, it can run a specified entry point after installation.
 
 ## The Name
 
-As you might guess, **pychubby** is a portmanteau of **py**thon and **chub**by.
+As you might guess, **pychubby** is a portmanteau of **py**thon and **chubby**.
 While the standard wheels are quite a bit leaner, consisting of your application
 and the metadata required to install it, **pychubby** bundles all of your
 dependencies into a single file. This results in a "thicker" file and, thus, the
