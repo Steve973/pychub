@@ -86,7 +86,8 @@ their use case. (Hint: it might, or might not, be pychubby!)
 | Feature/Need                | pychubby                        | pex                                  | zipapp                         | PyInstaller / PyOxidizer                         |
 |-----------------------------|---------------------------------|--------------------------------------|--------------------------------|--------------------------------------------------|
 | Single-file distribution    | Yes (`.chub`)                   | Yes                                  | Yes (`.pyz`)                   | Yes (binary)                                     |
-| Includes Python interpreter | No - uses current environment   | Yes - bundled runtime                | No - uses host interpreter     | Yes - frozen binary                              |
+| Includes Python interpreter | No - uses current environment   | No - uses host interpeter            | No - uses host interpreter     | Yes - frozen binary                              |
+
 | Reproducible install        | Yes - exact wheel copies        | Yes - via PEX-locked deps            | Sometimes - zip structure      | No - binary blob                                 |
 | Works in venv/conda/sys env | Yes - pip into any target       | Somewhat (venv-only)                 | Yes - but ephemeral venv       | Yes – standalone embedded runtime (not reusable) |
 | Create a new venv           | Yes - ephemeral or persistent   | Yes - existing or new/ephemeral      | Yes - ephemeral                | No – uses frozen, internal environment           |
@@ -106,7 +107,7 @@ match, a partial fit, or better suited elsewhere.
 | Use Case / Scenario                              | pychubby  | pex        | zipapp    | PyInstaller / PyOxidizer |
 |--------------------------------------------------|-----------|------------|-----------|--------------------------|
 | Distribute a CLI/lib in one file                 | best fit  | best fit   | works     | overkill                 |
-| Ship sealed GUI/CLI to end users with no Python  | n/a       | n/a        | n/a       | best fit                 |
+| Ship sealed GUI/CLI to end users with no Python  | n/a       | best fit⁷  | n/a       | best fit                 |
 | Run directly from compressed archive             | works     | best fit   | best fit  | n/a                      |
 | Reproducible install without network             | best fit  | best fit   | possible¹ | works                    |
 | Install into *any* Python env (sys, venv, conda) | best fit  | venv-only² | best fit  | n/a                      |
@@ -127,6 +128,7 @@ Notes:
 4. Build-time only: PyOxidizer allows scripted setup during packaging, not at install time.
 5. Partial cross-platform: PEX artifacts must match target platforms; wheel compatibility can limit this.
 6. Planned feature: pychubby currently supports pip-based installs only. Conda support is on the potential roadmap.
+7. When using Pex `--scie {eager,lazy}` which produces a native executable that includes Python.
 
 So the point isn’t that any of these are "best" or "wrong" tools. They’re all
 excellent for the jobs they were built for. Pychubby simply covers a different
