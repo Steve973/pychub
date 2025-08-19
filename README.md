@@ -87,7 +87,6 @@ their use case. (Hint: it might, or might not, be pychubby!)
 |-----------------------------|---------------------------------|--------------------------------------|--------------------------------|--------------------------------------------------|
 | Single-file distribution    | Yes (`.chub`)                   | Yes                                  | Yes (`.pyz`)                   | Yes (binary)                                     |
 | Includes Python interpreter | No - uses current environment   | No - uses host interpeter            | No - uses host interpreter     | Yes - frozen binary                              |
-
 | Reproducible install        | Yes - exact wheel copies        | Yes - via PEX-locked deps            | Sometimes - zip structure      | No - binary blob                                 |
 | Works in venv/conda/sys env | Yes - pip into any target       | Somewhat (venv-only)                 | Yes - but ephemeral venv       | Yes – standalone embedded runtime (not reusable) |
 | Create a new venv           | Yes - ephemeral or persistent   | Yes - existing or new/ephemeral      | Yes - ephemeral                | No – uses frozen, internal environment           |
