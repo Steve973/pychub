@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 def discover_wheels(libs_dir: Path, only: str | None) -> list[Path]:
