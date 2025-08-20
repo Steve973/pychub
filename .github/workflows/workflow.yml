@@ -8,17 +8,20 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install test dependencies
-        run: pip install -U pip pytest pyyaml
+        run: pip install -U attrs pip pytest pyyaml
 
       - name: Ensure src is on PYTHONPATH
         run: echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> $GITHUB_ENV
@@ -33,13 +36,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.9"
 
       - name: Install build tool
-        run: pip install build
+        run: pip install -U build
 
       - name: Build distribution
         run: python -m build
@@ -57,10 +60,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.9"
 
       - name: Download dist
         uses: actions/download-artifact@v4
@@ -70,5 +73,5 @@ jobs:
 
       - name: Twine check
         run: |
-          pip install twine
+          pip install -U twine
           twine check dist/*

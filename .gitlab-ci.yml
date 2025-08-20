@@ -4,39 +4,57 @@ stages:
   - verify
   - publish
 
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_INPUT: "1"
+  PYTHONPATH: "$CI_PROJECT_DIR/src"
+
+cache:
+  key: "pip-$CI_JOB_IMAGE"
+  paths:
+    - .cache/pip
+
+# Matrix-style tests across supported Python minors.
 test:
   stage: test
-  image: python:3.12
+  image: python:${PY_VERSION}
+  parallel:
+    matrix:
+      - PY_VERSION: ["3.9", "3.10", "3.11", "3.12", "3.13"]
   script:
-    - pip install -U pip pytest pyyaml
+    - pip install -U attrs pip pytest pyyaml
     - pytest
-  artifacts:
-    paths:
-      - dist/
 
+# Build once on the minimum supported (3.9).
 build:
   stage: build
-  image: python:3.12
+  image: python:3.9
+  needs: ["test"]
   script:
     - pip install -U build
     - python -m build
   artifacts:
+    when: always
+    expire_in: 1 week
     paths:
       - dist/
 
+# Validate the built artifacts.
 verify:
   stage: verify
-  image: python:3.12
+  image: python:3.9
+  needs: ["build"]
+  dependencies:
+    - build
   script:
     - pip install -U twine
     - twine check dist/*
-  dependencies:
-    - build
 
+# Placeholder for releases.
 publish:
   stage: publish
-  image: python:3.12
+  image: python:3.9
+  rules:
+    - when: never  # enable later
   script:
     - echo "Publishing disabled for now."
-  rules:
-    - when: never  # TODO - Enable this when testing is complete
