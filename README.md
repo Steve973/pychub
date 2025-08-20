@@ -120,7 +120,7 @@ match, a partial fit, or better suited elsewhere.
 | Package with Conda dependencies                  | roadmap⁵  | n/a                                | n/a       | n/a                      |
 | Support compile-time customization or setup      | limited³  | n/a                                | n/a       | yes (scriptable)         |
 
-Notes:
+##### Notes:
 ¹ Zipapps can embed dependencies, but behavior varies depending on how you construct the archive.  
 ² pychubby is only cross-platform if bundled wheels themselves are portable.  
 ³ Only pychubby supports runtime post-install user scripts.  
