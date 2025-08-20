@@ -13,6 +13,7 @@ license = "MIT"
 python = ">=3.9"
 pyyaml = "^6.0.2"
 pytest = "^8.4.1"
+attrs = "^25.3.0"
 
 [tool.poetry.scripts]
 pychubby = "pychubby.cli:main"
