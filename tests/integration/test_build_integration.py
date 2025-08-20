@@ -31,13 +31,18 @@ def test_env():
     if not python_bin.exists():
         raise RuntimeError("Could not find venv Python binary")
 
+    subprocess.run(
+        [str(python_bin), "-m", "pip", "install", "--upgrade", "poetry"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+
     # Install pychubby (editable)
     subprocess.run(
         [str(python_bin), "-m", "pip", "install", "-e", str(root_dir)],
         check=True,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+        stderr=subprocess.PIPE)
 
     # Build wheel once
     subprocess.run(
@@ -45,8 +50,8 @@ def test_env():
         cwd=test_pkg_dir,
         check=True,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+        stderr=subprocess.PIPE)
+
     wheels = list(dist_dir.glob("*.whl"))
     assert wheels, "No wheel was built"
 
@@ -64,10 +69,8 @@ def test_env():
 
 
 def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
-    chub_build_dir = tmp_path / CHUB_BUILD_DIR / "test-pkg-0.1.0"
-    print ("##### Chub build dir: ", chub_build_dir)
+    chub_build_dir = tmp_path / CHUB_BUILD_DIR
     chub_out = tmp_path / "test_pkg.chub"
-    print("##### Chub output file: ", chub_out)
 
     # 🚽 Clean up chub-build to avoid .chubconfig conflicts
     if chub_build_dir.exists():
@@ -100,8 +103,7 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env=env,
-    )
+        env=env)
 
 
 def get_chub_contents(chub_path):

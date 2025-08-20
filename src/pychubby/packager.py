@@ -149,10 +149,14 @@ def get_wheel_metadata(wheel_path: str | Path, normalize_name: bool = True) -> t
     return name, version
 
 
+def get_wheel_package_dir_name(package_name: str, version: str) -> str:
+    return "-".join([package_name, version])
+
+
 def get_wheel_package_dir(package_name: str,
                           version: str,
                           chub_build_dir: str | Path) -> Path:
-    wheel_package_name = "-".join([package_name, version])
+    wheel_package_name = get_wheel_package_dir_name(package_name, version)
     wheel_package_dir = Path(chub_build_dir / wheel_package_name).resolve()
     wheel_package_dir.mkdir(parents=True, exist_ok=True)
     wheel_libs_dir = wheel_package_dir / CHUB_LIBS_DIR
@@ -214,7 +218,7 @@ def validate_chub_structure(wheel_package_dir: Path,
     # 2. Ensure the build dir exists and has a .chubconfig
     chubconfig_file = chub_build_dir / CHUBCONFIG_FILENAME
     if not chubconfig_file.exists():
-        raise FileNotFoundError(f"Missing {CHUBCONFIG_FILENAME} in build directory")
+        raise FileNotFoundError(f"Missing {CHUBCONFIG_FILENAME} in {chub_build_dir}")
 
     # 3. Check for name-version collision in existing .chubconfig
     try:
@@ -280,8 +284,9 @@ def build_chub(wheel_path: str | Path,
     verify_pip()
     chub_build_dir = create_chub_build_dir_structure(wheel_path, chub_path)
     package_name, version = get_wheel_metadata(wheel_path)
+    wheel_package_dir_name = Path(get_wheel_package_dir_name(package_name, version))
+    validate_chub_structure(chub_build_dir / wheel_package_dir_name, entrypoint, post_install_scripts, included_files)
     wheel_package_dir = get_wheel_package_dir(package_name, version, chub_build_dir)
-    validate_chub_structure(wheel_package_dir, post_install_scripts, included_files)
     wheel_libs_dir = wheel_package_dir / CHUB_LIBS_DIR
     shutil.copy2(wheel_path, wheel_libs_dir / wheel_path.name)
     download_wheel_deps(wheel_path, wheel_libs_dir)
