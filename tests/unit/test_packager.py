@@ -495,7 +495,7 @@ def test_build_chub_happy_path(monkeypatch, tmp_path, capsys):
 
     out = packager.build_chub(wheel_path, chub_path=None, entrypoint="m:f")
 
-    expected = build_dir / "pkg-1.0.0"
+    expected = build_dir / "pkg-1.0.0.chub"
     assert out == expected
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 import sys
+import tempfile
+import zipfile
 from pathlib import Path
 
 from .chubconfig import load_chubconfig
@@ -20,10 +22,30 @@ def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     args, passthru = build_parser().parse_known_args(argv)
 
-    bundle_root = Path(__file__).resolve().parent
-    libs_dir = (bundle_root / DEFAULT_LIBS_DIR).resolve()
-    config = load_chubconfig(bundle_root)
-    baked_entrypoint = config.get("baked_entrypoint")
+    # Detect if we're inside a .chub archive
+    chub_path = str(Path(__file__))
+    print(f"Checking if {chub_path} is inside a .chub archive...")
+
+    cur_file = Path(__file__)
+    if ".chub/" in chub_path:
+        chub_str = chub_path[:chub_path.index(".chub/") + len(".chub")]
+        cur_file = Path(chub_str)
+
+    if zipfile.is_zipfile(cur_file):
+        tmpdir = Path(tempfile.mkdtemp(prefix="chub-extract-"))
+        print(f"Extracting {cur_file} to {tmpdir}...")
+        with zipfile.ZipFile(cur_file) as zf:
+            zf.extractall(tmpdir)
+        bundle_root = tmpdir
+    else:
+        print("Not inside a .chub archive, using current directory...")
+        bundle_root = cur_file.resolve().parent
+
+    config_docs = load_chubconfig(bundle_root)
+    bundle_config = config_docs[0] if config_docs else {}
+    module_name = f'{bundle_config["name"]}-{bundle_config["version"]}'
+    libs_dir = (bundle_root / module_name / DEFAULT_LIBS_DIR).resolve()
+    entrypoint = bundle_config["entrypoint"]
 
     if args.exec:
         args.no_scripts = True
@@ -60,10 +82,13 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     if not args.no_scripts:
-        run_post_install_scripts(bundle_root, config.get("post_install_scripts", []))
+        run_post_install_scripts(
+            bundle_root,
+            bundle_config.get("post_install_scripts", []))
 
     if args.exec or args.run is not None:
-        maybe_run_entrypoint(args.run, baked_entrypoint, passthru)
+        print(f"Running entrypoint: {entrypoint}...")
+        maybe_run_entrypoint(args.run, entrypoint, passthru)
 
 
 if __name__ == "__main__":

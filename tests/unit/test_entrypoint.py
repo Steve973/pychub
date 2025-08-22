@@ -72,7 +72,7 @@ def test_run_entrypoint_fails_if_not_found(monkeypatch):
     with pytest.raises(SystemExit):
         entrypoint.run_entrypoint("nope", [])
 
-    assert "no console_scripts entry point named 'nope'" in called["msg"]
+    assert "Could not run module 'nope' as a script: No module named nope" in called["msg"]
 
 
 @pytest.mark.parametrize(

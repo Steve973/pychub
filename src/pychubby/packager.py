@@ -304,7 +304,7 @@ def build_chub(wheel_path: str | Path,
     with chubconfig_file.open("a", encoding="utf-8") as f:
         f.write(chubconfig_text)
     if chub_path is None:
-        chub_path = chub_build_dir / wheel_package_dir.name
+        chub_path = chub_build_dir / f"{wheel_package_dir.name}.chub"
     output_path = create_chub_archive(chub_build_dir, chub_path)
     print(f"Built {output_path}")
     return output_path

@@ -1,17 +1,17 @@
-import json
+import yaml
 import sys
 from pathlib import Path
 
-from src.pychubby.runtime.constants import CHUBCONFIG_FILENAME
+from pychubby.runtime.constants import CHUBCONFIG_FILENAME
 
 
-def load_chubconfig(bundle_root: Path) -> dict:
+def load_chubconfig(bundle_root: Path) -> list[dict]:
     config_file = bundle_root / CHUBCONFIG_FILENAME
     if not config_file.exists():
-        return {}
+        return []
     try:
         with config_file.open("r", encoding="utf-8") as f:
-            return json.load(f)
+            return list(yaml.safe_load_all(f))
     except Exception as e:
         print(f"Warning: failed to parse {CHUBCONFIG_FILENAME}: {e}", file=sys.stderr)
-        return {}
+        return []
