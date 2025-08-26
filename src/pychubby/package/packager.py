@@ -30,11 +30,24 @@ def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
 
 
 def copy_runtime_files(chub_build_dir: Path) -> None:
-    runtime_src = Path(__file__).parent / RUNTIME_DIR
+    candidates = [
+        Path(__file__).resolve().parent.parent / RUNTIME_DIR,  # src/pychubby/runtime
+        Path(__file__).resolve().parent / RUNTIME_DIR,         # src/pychubby/package/runtime (legacy)
+    ]
+    runtime_src = next((p for p in candidates if p.exists()), None)
+    if runtime_src is None:
+        tried = " | ".join(str(p) for p in candidates)
+        raise FileNotFoundError(
+            f"Runtime directory not found. Looked in: {tried}")
+
     runtime_dst = chub_build_dir / RUNTIME_DIR
     shutil.copytree(runtime_src, runtime_dst, dirs_exist_ok=True)
+
+    # Ensure archive runs via `python test_pkg.chub`
     chub_main_py = chub_build_dir / "__main__.py"
-    chub_main_py.write_text(f"import runpy; runpy.run_module('{RUNTIME_DIR}', run_name='__main__')\n")
+    chub_main_py.write_text(
+        f"import runpy; runpy.run_module('{RUNTIME_DIR}', run_name='__main__')",
+        encoding="utf-8")
 
 
 def copy_included_files(chub_base: Path, included_files: list[str] | []) -> None:

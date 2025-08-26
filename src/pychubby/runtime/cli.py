@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
-"""runtime/cli.py
 
-Runtime CLI that matches the README's "Operating a Chub" section.
-
-- Captures an optional ENTRYPOINT for --run (overrides baked-in).
-- Supports ephemeral install via --exec (temp venv; implies --no-scripts).
-- Allows argv passthrough after "--" to the entrypoint unchanged.
-
-This module only *parses* arguments. Business logic lives in the runtime.
-"""
 from __future__ import annotations
 
 import argparse

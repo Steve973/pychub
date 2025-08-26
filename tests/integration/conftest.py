@@ -7,7 +7,6 @@ import zipfile
 from pathlib import Path
 
 import pytest
-import yaml
 
 from pychubby.package.constants import CHUB_BUILD_DIR
 
@@ -23,7 +22,6 @@ def test_env():
     temp_dir = Path(tempfile.mkdtemp(prefix="integration-tests-"))
     venv_dir = temp_dir / "venv"
 
-    # Create venv
     venv.create(venv_dir, with_pip=True)
     python_bin = venv_dir / "bin" / "python"
     if not python_bin.exists():
@@ -31,29 +29,24 @@ def test_env():
     if not python_bin.exists():
         raise RuntimeError("Could not find venv Python binary")
 
-    subprocess.run(
-        [str(python_bin), "-m", "pip", "install", "--upgrade", "poetry"],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-
-    # Install pychubby (editable)
-    subprocess.run(
-        [str(python_bin), "-m", "pip", "install", "-e", str(root_dir)],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-
-    # Build wheel once
-    subprocess.run(
-        ["poetry", "build"],
-        cwd=test_pkg_dir,
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
+    subprocess.run([str(python_bin), "-m", "pip", "install", "--upgrade", "poetry"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run([str(python_bin), "-m", "pip", "install", "-e", str(root_dir)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(["poetry", "build"], cwd=test_pkg_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     wheels = list(dist_dir.glob("*.whl"))
     assert wheels, "No wheel was built"
+
+    # Test-only shim: make packager's legacy runtime path resolve
+    runtime_real = src_dir / "pychubby" / "runtime"
+    runtime_legacy = src_dir / "pychubby" / "package" / "runtime"
+    created = None
+    if runtime_real.exists() and not runtime_legacy.exists():
+        try:
+            runtime_legacy.symlink_to(runtime_real, target_is_directory=True)
+            created = ("symlink", runtime_legacy)
+        except (OSError, NotImplementedError):
+            shutil.copytree(runtime_real, runtime_legacy)
+            created = ("copy", runtime_legacy)
 
     yield {
         "temp_dir": temp_dir,
@@ -62,66 +55,68 @@ def test_env():
         "root_dir": root_dir,
         "src_dir": src_dir,
         "test_pkg_dir": test_pkg_dir,
-        "wheel_path": wheels[0]
+        "wheel_path": wheels[0],
+        "_runtime_created": created
     }
 
+    if created:
+        kind, path = created
+        if kind == "symlink" and path.exists():
+            path.unlink()
+        elif kind == "copy" and path.exists():
+            shutil.rmtree(path)
     shutil.rmtree(temp_dir)
 
 
-def run_runtime_cli(chub_path: Path, args: list[str], python_bin: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [str(python_bin), str(chub_path), *args],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True)
+def run_runtime_cli(chub_path: Path, args: list[str], python_bin: Path):
+    return subprocess.run([str(python_bin), str(chub_path), *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
 def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     chub_build_dir = tmp_path / CHUB_BUILD_DIR
     chub_out = tmp_path / "test_pkg.chub"
 
-    # 🚽 Clean up chub-build to avoid .chubconfig conflicts
     if chub_build_dir.exists():
         shutil.rmtree(chub_build_dir)
 
-    args = [
-        str(test_env["python_bin"]),
-        "-m", "pychubby.cli",
-        str(wheel_path),
-        "--chub", str(chub_out),
-    ]
+    args = [str(test_env["python_bin"]), "-m", "pychubby.package.cli", str(wheel_path), "--chub", str(chub_out)]
 
-    if "entrypoint" in kwargs:
-        args += ["--entrypoint", kwargs["entrypoint"]]
-    if "scripts" in kwargs:
-        for script in kwargs["scripts"]:
+    entrypoint = kwargs.get("entrypoint")
+    if entrypoint:
+        args += ["--entrypoint", entrypoint]
+    scripts = kwargs.get("scripts")
+    if scripts:
+        for script in scripts:
             args += ["--scripts", script]
-    if "includes" in kwargs:
-        for inc in kwargs["includes"]:
+    includes = kwargs.get("includes")
+    if includes:
+        for inc in includes:
             args += ["--includes", inc]
-    if "metadata" in kwargs:
-        for k, v in kwargs["metadata"].items():
-            args += ["--metadata-entry", k, v]
+    metadata = kwargs.get("metadata")
+    if metadata:
+        for k, v in metadata.items():
+            args += ["--metadata-entry", f"{k}={v}"]
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(test_env["src_dir"])
+    env["PYTHONPATH"] = str(test_env["src_dir"])  # ensure `import pychubby` resolves
 
-    result = subprocess.run(
-        args,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env)
-
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     return result, chub_out
 
 
-def get_chub_contents(chub_path):
+def get_chub_contents(chub_path: Path):
+    """Return (names, ChubConfig instance) from the built .chub archive."""
+    from pychubby.model.chubconfig_model import ChubConfig
+
     with zipfile.ZipFile(chub_path, "r") as zf:
         names = zf.namelist()
-        chubconfig = None
+        text = None
         for name in names:
             if name.endswith(".chubconfig"):
                 with zf.open(name) as f:
-                    chubconfig = list(yaml.safe_load_all(f.read()))
-        return names, chubconfig
+                    text = f.read().decode("utf-8")
+                break
+        if text is None:
+            return names, None
+        cfg = ChubConfig.from_yaml(text)
+        return names, cfg
