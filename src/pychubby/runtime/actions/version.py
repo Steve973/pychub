@@ -1,7 +1,7 @@
 import sys
 import importlib.metadata as im
 
-from pychubby.runtime.actions.discover import discover_wheels
+from .discover import discover_wheels
 
 
 def show_version(libs_dir) -> None:

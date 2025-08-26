@@ -1,20 +1,6 @@
-import zipfile
-
 import pytest
-import yaml
 
-from tests.integration.conftest import run_build_cli
-
-
-def get_chub_contents(chub_path):
-    with zipfile.ZipFile(chub_path, "r") as zf:
-        names = zf.namelist()
-        chubconfig = None
-        for name in names:
-            if name.endswith(".chubconfig"):
-                with zf.open(name) as f:
-                    chubconfig = list(yaml.safe_load_all(f.read()))
-        return names, chubconfig
+from tests.integration.conftest import run_build_cli, get_chub_contents
 
 
 @pytest.mark.integration

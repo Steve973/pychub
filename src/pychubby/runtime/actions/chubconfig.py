@@ -1,17 +1,19 @@
-import yaml
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
+from pychubby.model.chubconfig_model import ChubConfig
 from pychubby.runtime.constants import CHUBCONFIG_FILENAME
 
 
-def load_chubconfig(bundle_root: Path) -> list[dict]:
+def load_chubconfig(bundle_root: Path) -> ChubConfig | None:
     config_file = bundle_root / CHUBCONFIG_FILENAME
     if not config_file.exists():
-        return []
+        print(f"Warning: the .chubconfig file '{CHUBCONFIG_FILENAME}' does not exist", file=sys.stderr)
+        return None
     try:
-        with config_file.open("r", encoding="utf-8") as f:
-            return list(yaml.safe_load_all(f))
+        return ChubConfig.from_file(config_file)
     except Exception as e:
         print(f"Warning: failed to parse {CHUBCONFIG_FILENAME}: {e}", file=sys.stderr)
-        return []
+        return None

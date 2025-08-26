@@ -1,48 +1,65 @@
 import sys
+import argparse
+from types import SimpleNamespace
 from pathlib import Path
 import pytest
 
 from pychubby.runtime.actions import runtime_main
-from pychubby.runtime.constants import DEFAULT_LIBS_DIR, CHUBCONFIG_FILENAME
+from pychubby.runtime.constants import CHUB_LIBS_DIR
 
-import yaml
+
+# --- Helpers / fixtures ---
+
+@pytest.fixture(autouse=True)
+def fake_parser(monkeypatch):
+    """Patch CLI parser to a minimal, test-friendly one matching flags used."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--version", action="store_true")
+    parser.add_argument("--list", action="store_true")
+    parser.add_argument("--unpack", nargs="?", const=".")
+    parser.add_argument("--venv")
+    parser.add_argument("--exec", dest="exec", action="store_true")
+    parser.add_argument("--run", nargs="?", const="")
+    parser.add_argument("--only")
+    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--dry_run", action="store_true")
+    parser.add_argument("--no_deps", action="store_true")
+    parser.add_argument("--no-scripts", dest="no_scripts", action="store_true")
+    parser.add_argument("--no-pre-scripts", dest="no_pre_scripts", action="store_true")
+    parser.add_argument("--no-post-scripts", dest="no_post_scripts", action="store_true")
+
+    monkeypatch.setattr(runtime_main, "build_parser", lambda: parser)
+
 
 @pytest.fixture
-def fake_bundle(tmp_path, monkeypatch):
-    package_name = "test_pkg"
-    version = "1.0.0"
-    module_dir = f'{package_name}-{version}'
-    root = tmp_path / "bundle"
-    libs = root / module_dir / DEFAULT_LIBS_DIR
-    libs.mkdir(parents=True)
+def config_obj():
+    return SimpleNamespace(entrypoint="test_pkg.greet:main", scripts=SimpleNamespace(pre=[], post=[]))
 
-    # Add a fake __file__ so runtime thinks it's executing from this path
+
+@pytest.fixture
+def fake_bundle(tmp_path, monkeypatch, config_obj):
+    root = tmp_path / "bundle"
+    root.mkdir()
+    libs = (root / CHUB_LIBS_DIR)
+    libs.mkdir(parents=True)
+    (libs / "test_pkg-1.0.0-py3-none-any.whl").touch()
+
+    # runtime resolves bundle_root as parent of __file__
     monkeypatch.setattr(runtime_main, "__file__", str(root / "main.py"))
 
-    # Add dummy .chubconfig
-    chubconfig_data = {
-        "name": f"{package_name}",
-        "version": f"{version}",
-        "entrypoint": "test_pkg.greet:main",
-        "post_install_scripts": [],
-        "includes": [],
-        "metadata": {},
-        "baked_entrypoint": "entry"
-    }
-    (root / CHUBCONFIG_FILENAME).write_text(
-        yaml.dump(chubconfig_data, sort_keys=False), encoding="utf-8"
-    )
-
-    # Add a fake wheel
-    (libs / "test_pkg-1.0.0-py3-none-any.whl").touch()
+    # stabilize config
+    monkeypatch.setattr(runtime_main, "load_chubconfig", lambda r: config_obj)
 
     return root, libs
 
 
+# --- Simple info actions ---
+
 def test_main_prints_version(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-
     monkeypatch.setattr(sys, "argv", ["pychubby", "--version"])
+
     called = {}
     monkeypatch.setattr(runtime_main, "show_version", lambda d: called.setdefault("version", d))
 
@@ -52,8 +69,8 @@ def test_main_prints_version(monkeypatch, fake_bundle):
 
 def test_main_lists_wheels(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-
     monkeypatch.setattr(sys, "argv", ["pychubby", "--list"])
+
     called = {}
     monkeypatch.setattr(runtime_main, "list_wheels", lambda d: called.setdefault("list", d))
 
@@ -66,12 +83,13 @@ def test_main_unpacks(monkeypatch, fake_bundle):
     monkeypatch.setattr(sys, "argv", ["pychubby", "--unpack", "/tmp/foo"])
 
     unpacked = {}
-    monkeypatch.setattr(runtime_main, "unpack_wheels", lambda lib, dest: unpacked.setdefault("args", (lib, dest)))
+    monkeypatch.setattr(runtime_main, "unpack_chub", lambda bundle, dest: unpacked.setdefault("args", (bundle, dest)))
 
     runtime_main.main()
-    assert unpacked["args"][0] == libs
-    assert Path("/tmp/foo") == unpacked["args"][1]
+    assert unpacked["args"] == (root, Path("/tmp/foo"))
 
+
+# --- Discover / error path ---
 
 def test_main_errors_when_no_wheels(monkeypatch, fake_bundle):
     root, libs = fake_bundle
@@ -81,45 +99,165 @@ def test_main_errors_when_no_wheels(monkeypatch, fake_bundle):
 
     with pytest.raises(SystemExit) as exc:
         runtime_main.main()
-    assert "no wheels found" in str(exc.value)
+    assert "no wheels found in bundle" in str(exc.value)
 
 
-def test_main_exec_skips_scripts(monkeypatch, fake_bundle):
+# --- Exec path (ephemeral venv) ---
+
+def test_main_exec_skips_scripts_and_runs_entrypoint(monkeypatch, fake_bundle, config_obj):
     root, libs = fake_bundle
     monkeypatch.setattr(sys, "argv", ["pychubby", "--exec"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
-    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: kw.setdefault("installed", True))
-    monkeypatch.setattr(runtime_main, "maybe_run_entrypoint", lambda *a: a)
 
-    ran = {}
-    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a: ran.setdefault("scripts", True))
+    # ensure scripts are NOT called
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: (_ for _ in ()).throw(AssertionError("post should not run")))
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: (_ for _ in ()).throw(AssertionError("pre should not run")))
+
+    create_calls = {}
+    monkeypatch.setattr(runtime_main, "create_venv", lambda path, wheels, **opts: create_calls.setdefault("venv", (path, list(wheels))))
+
+    monkeypatch.setattr(runtime_main, "_venv_python", lambda p: Path("/vpy"))
+
+    install_calls = {}
+    def fake_install(**kw):
+        install_calls.update(kw)
+    monkeypatch.setattr(runtime_main, "install_wheels", fake_install)
+
+    run_calls = {}
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda py, target, args: run_calls.setdefault("call", (py, target, list(args))) or 0)
 
     runtime_main.main()
-    assert "scripts" not in ran  # should skip due to --exec
+
+    assert install_calls["python"] == str(Path("/vpy"))
+    assert run_calls["call"][0] == Path("/vpy")
+    assert run_calls["call"][1] == config_obj.entrypoint
 
 
-def test_main_handles_venv(monkeypatch, fake_bundle):
+def test_main_exec_forwards_passthru_after_dashdash(monkeypatch, fake_bundle):
+    root, libs = fake_bundle
+    monkeypatch.setattr(sys, "argv", ["pychubby", "--exec", "--", "--alpha", "1"])
+    monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
+    monkeypatch.setattr(runtime_main, "create_venv", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "_venv_python", lambda p: Path("/vpy"))
+    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
+
+    captured = {}
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda py, target, args: captured.setdefault("args", list(args)) or 0)
+
+    runtime_main.main()
+    assert captured["args"] == ["--alpha", "1"]
+
+
+# --- Venv persistent install path ---
+
+def test_main_handles_venv_with_pre_and_post(monkeypatch, fake_bundle):
     root, libs = fake_bundle
     monkeypatch.setattr(sys, "argv", ["pychubby", "--venv", "/my/venv"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
 
-    called = {}
-    monkeypatch.setattr(runtime_main, "create_venv", lambda path, wheels, **opts: called.setdefault("venv", (path, wheels, opts)))
+    pre, post, inst = {}, {}, {}
+    monkeypatch.setattr(runtime_main, "create_venv", lambda path, wheels, **opts: None)
+    monkeypatch.setattr(runtime_main, "_venv_python", lambda p: Path("/vpy"))
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda root, items: pre.setdefault("ok", (root, list(items))))
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda root, items: post.setdefault("ok", (root, list(items))))
+    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: inst.setdefault("kw", kw))
 
     runtime_main.main()
-    assert called["venv"][0] == Path("/my/venv")
-    assert called["venv"][1] == [libs / "a.whl"]
+
+    assert pre["ok"][0] == root and post["ok"][0] == root
+    assert inst["kw"]["python"] == str(Path("/vpy"))
 
 
-def test_main_normal_install(monkeypatch, fake_bundle):
+def test_main_venv_no_pre_scripts_skips_install_but_may_run_post(monkeypatch, fake_bundle):
+    root, libs = fake_bundle
+    monkeypatch.setattr(sys, "argv", ["pychubby", "--venv", "/venv", "--no-pre-scripts"])
+    monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
+
+    calls = {"pre": 0, "post": 0, "install": 0}
+    monkeypatch.setattr(runtime_main, "create_venv", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "_venv_python", lambda p: Path("/vpy"))
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: (_ for _ in ()).throw(AssertionError("pre should be skipped")))
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: calls.update(post=calls["post"] + 1))
+    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: calls.update(install=calls["install"] + 1))
+
+    runtime_main.main()
+
+    assert calls["install"] == 0  # per current implementation
+    assert calls["post"] == 1
+
+
+# --- Non-venv install + optional run ---
+
+def test_main_normal_install_runs_pre_and_post(monkeypatch, fake_bundle):
     root, libs = fake_bundle
     monkeypatch.setattr(sys, "argv", ["pychubby"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
 
-    flow = {}
-    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: flow.setdefault("installed", True))
-    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a: flow.setdefault("scripts", True))
-    monkeypatch.setattr(runtime_main, "maybe_run_entrypoint", lambda *a: flow.setdefault("ran", a))
+    flow = {"pre": 0, "post": 0, "install": 0}
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: flow.update(pre=flow["pre"] + 1))
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: flow.update(post=flow["post"] + 1))
+    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: flow.update(install=flow["install"] + 1))
 
     runtime_main.main()
-    assert flow == {"installed": True, "scripts": True}
+    assert flow == {"pre": 1, "install": 1, "post": 1}
+
+
+def test_main_run_baked_entrypoint_when_run_flag_no_arg(monkeypatch, fake_bundle, config_obj):
+    root, libs = fake_bundle
+    monkeypatch.setattr(sys, "argv", ["pychubby", "--run"])
+    monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
+
+    # bypass pre/post/install quickly
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
+
+    captured = {}
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda py, target, args: captured.setdefault("v", (py, target, args)) or 0)
+
+    runtime_main.main()
+
+    py, target, args = captured["v"]
+    assert py == Path(sys.executable)
+    assert target == config_obj.entrypoint  # baked wins when --run has no value
+
+
+def test_main_run_exit_nonzero_exits(monkeypatch, fake_bundle):
+    root, libs = fake_bundle
+    monkeypatch.setattr(sys, "argv", ["pychubby", "--run", "demo:main"])
+    monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
+
+    # silence install & scripts
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
+
+    exits = {}
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda *a: 5)
+    monkeypatch.setattr(runtime_main.sys, "exit", lambda code: exits.setdefault("code", code) or (_ for _ in ()).throw(SystemExit(code)))
+
+    with pytest.raises(SystemExit):
+        runtime_main.main()
+    assert exits["code"] == 5
+
+
+def test_main_passes_only_filter_to_discover(monkeypatch, fake_bundle):
+    root, libs = fake_bundle
+    monkeypatch.setattr(sys, "argv", ["pychubby", "--only", "bar"])
+
+    seen = {}
+
+    def fake_discover(path, only=None):
+        seen["libs"] = path
+        seen["only"] = only
+        return [libs / "x.whl"]
+
+    monkeypatch.setattr(runtime_main, "discover_wheels", fake_discover)
+    # skip actual work quickly
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
+
+    runtime_main.main()
+
+    assert seen == {"libs": libs, "only": "bar"}

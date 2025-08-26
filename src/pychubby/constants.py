@@ -1,5 +1,0 @@
-CHUB_BUILD_DIR = "chub-build"
-CHUB_LIBS_DIR = "libs"
-CHUB_SCRIPTS_DIR = "scripts"
-CHUBCONFIG_FILENAME = ".chubconfig"
-RUNTIME_DIR = "runtime"

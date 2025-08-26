@@ -3,11 +3,13 @@ import shutil
 import subprocess
 import tempfile
 import venv
+import zipfile
 from pathlib import Path
 
 import pytest
+import yaml
 
-from pychubby.constants import CHUB_BUILD_DIR
+from pychubby.package.constants import CHUB_BUILD_DIR
 
 
 @pytest.fixture(scope="session")
@@ -66,6 +68,14 @@ def test_env():
     shutil.rmtree(temp_dir)
 
 
+def run_runtime_cli(chub_path: Path, args: list[str], python_bin: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [str(python_bin), str(chub_path), *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True)
+
+
 def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     chub_build_dir = tmp_path / CHUB_BUILD_DIR
     chub_out = tmp_path / "test_pkg.chub"
@@ -104,3 +114,14 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
         env=env)
 
     return result, chub_out
+
+
+def get_chub_contents(chub_path):
+    with zipfile.ZipFile(chub_path, "r") as zf:
+        names = zf.namelist()
+        chubconfig = None
+        for name in names:
+            if name.endswith(".chubconfig"):
+                with zf.open(name) as f:
+                    chubconfig = list(yaml.safe_load_all(f.read()))
+        return names, chubconfig
