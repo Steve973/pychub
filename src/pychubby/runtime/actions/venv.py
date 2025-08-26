@@ -32,7 +32,7 @@ def create_venv(path: Path, wheels: list[Path], dry_run: bool = False, quiet: bo
         cmd += ["-v"]
     cmd += [str(w) for w in wheels]
 
-    result = subprocess.run(cmd, capture_output=not verbose, text=True)
+    result = subprocess.run(cmd, capture_output=not verbose or quiet, text=True)
     if result.returncode != 0:
         sys.stderr.write(result.stderr or "")
         sys.exit(result.returncode)

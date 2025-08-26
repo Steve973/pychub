@@ -59,10 +59,6 @@ class ChubConfig:
         return cfg
 
     @classmethod
-    def from_json(cls, s: str) -> "ChubConfig":
-        return cls.from_mapping(json.loads(s))
-
-    @classmethod
     def from_yaml(cls, s: str) -> "ChubConfig":
         if yaml is None:
             raise RuntimeError("PyYAML not installed")
@@ -73,9 +69,7 @@ class ChubConfig:
     def from_file(cls, path: str | Path) -> "ChubConfig":
         p = Path(path)
         text = p.read_text(encoding="utf-8")
-        if p.suffix.lower() in (".yaml", ".yml"):
-            return cls.from_yaml(text)
-        return cls.from_json(text)
+        return cls.from_yaml(text)
 
     def to_mapping(self) -> Dict[str, Any]:
         return {

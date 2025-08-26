@@ -170,8 +170,7 @@ def test_build_chub_happy_path(monkeypatch, tmp_path):
         post_install_scripts=[(wheel_path, "00_post.sh")],
         pre_install_scripts=[(wheel_path, "00_pre.sh")],
         included_files=[],
-        metadata={"main_wheel": wheel_path.name},
-    )
+        metadata={"main_wheel": wheel_path.name})
     assert out == chub_path
     # Verify contents on disk (flat)
     with zipfile.ZipFile(out) as z:

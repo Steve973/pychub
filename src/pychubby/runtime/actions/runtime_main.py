@@ -25,6 +25,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     # We use parse_known_args so args after "--" fall into `passthru`.
     args, passthru = parser.parse_known_args(argv)
+    if passthru and passthru[0] == "--":
+        passthru = passthru[1:]
 
     # Detect if we're inside a .chub archive
     cur_file = Path(__file__)

@@ -110,11 +110,23 @@ def test_main_exec_skips_scripts_and_runs_entrypoint(monkeypatch, fake_bundle, c
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
 
     # ensure scripts are NOT called
-    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: (_ for _ in ()).throw(AssertionError("post should not run")))
-    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: (_ for _ in ()).throw(AssertionError("pre should not run")))
+    monkeypatch.setattr(
+        runtime_main,
+        "run_post_install_scripts",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("post should not run")),
+    )
+    monkeypatch.setattr(
+        runtime_main,
+        "run_pre_install_scripts",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("pre should not run")),
+    )
 
     create_calls = {}
-    monkeypatch.setattr(runtime_main, "create_venv", lambda path, wheels, **opts: create_calls.setdefault("venv", (path, list(wheels))))
+    monkeypatch.setattr(
+        runtime_main,
+        "create_venv",
+        lambda path, wheels, **opts: create_calls.setdefault("venv", (path, list(wheels))),
+    )
 
     monkeypatch.setattr(runtime_main, "_venv_python", lambda p: Path("/vpy"))
 
@@ -124,8 +136,12 @@ def test_main_exec_skips_scripts_and_runs_entrypoint(monkeypatch, fake_bundle, c
     monkeypatch.setattr(runtime_main, "install_wheels", fake_install)
 
     run_calls = {}
-    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda py, target, args: run_calls.setdefault("call", (py, target, list(args))) or 0)
+    def _fake_run(py, target, args):
+        run_calls.setdefault("call", (py, target, list(args)))
+        return 0
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", _fake_run)
 
+    # success path: main() returns, does not sys.exit
     runtime_main.main()
 
     assert install_calls["python"] == str(Path("/vpy"))
@@ -142,8 +158,12 @@ def test_main_exec_forwards_passthru_after_dashdash(monkeypatch, fake_bundle):
     monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
 
     captured = {}
-    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda py, target, args: captured.setdefault("args", list(args)) or 0)
+    def _fake_run_args(py, target, args):
+        captured.setdefault("args", list(args))
+        return 0
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", _fake_run_args)
 
+    # success path: main() returns
     runtime_main.main()
     assert captured["args"] == ["--alpha", "1"]
 
@@ -213,8 +233,12 @@ def test_main_run_baked_entrypoint_when_run_flag_no_arg(monkeypatch, fake_bundle
     monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
 
     captured = {}
-    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda py, target, args: captured.setdefault("v", (py, target, args)) or 0)
+    def _fake_run_baked(py, target, args):
+        captured.setdefault("v", (py, target, args))
+        return 0
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", _fake_run_baked)
 
+    # success path: main() returns
     runtime_main.main()
 
     py, target, args = captured["v"]
@@ -232,14 +256,20 @@ def test_main_run_exit_nonzero_exits(monkeypatch, fake_bundle):
     monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: None)
     monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
 
-    exits = {}
+    # entrypoint returns non-zero
     monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda *a: 5)
-    monkeypatch.setattr(runtime_main.sys, "exit", lambda code: exits.setdefault("code", code) or (_ for _ in ()).throw(SystemExit(code)))
+
+    exits = {}
+
+    def _fake_exit(code):
+        exits["code"] = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(runtime_main.sys, "exit", _fake_exit)
 
     with pytest.raises(SystemExit):
         runtime_main.main()
     assert exits["code"] == 5
-
 
 def test_main_passes_only_filter_to_discover(monkeypatch, fake_bundle):
     root, libs = fake_bundle

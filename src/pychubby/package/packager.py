@@ -106,7 +106,7 @@ def download_wheel_deps(
     if result.returncode != 0:
         raise RuntimeError(f"pip download failed:\n{result.stderr}")
     after = set(dest.glob("*.whl")) or []
-    return sorted(f.name for f in (after - before)) or []
+    return sorted(f.name for f in set(after) - set(before)) or []
 
 
 def get_wheel_metadata(wheel_path: str | Path,
@@ -182,9 +182,9 @@ def validate_chub_structure(chub_build_dir: Path,
     # 2. Confirm no leftover junk in libs/scripts
     libs = chub_build_dir / CHUB_LIBS_DIR
     scripts = chub_build_dir / CHUB_SCRIPTS_DIR
-    if libs.exists() and any(libs.iterdir()):
+    if libs.exists() and any(p.is_file() for p in libs.iterdir()):
         raise FileExistsError(f"libs/ in {chub_build_dir} is not empty")
-    if scripts.exists() and any(scripts.iterdir()):
+    if scripts.exists() and any(p.is_file() for p in libs.iterdir()):
         raise FileExistsError(f"scripts/ in {chub_build_dir} is not empty")
 
     # 3. Validate included files
