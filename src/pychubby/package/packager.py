@@ -21,7 +21,9 @@ from ..model.chubconfig_model import ChubConfig, Scripts
 
 def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
     with zipfile.ZipFile(chub_archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for file_path in chub_build_dir.rglob("*"):
+        for file_path in sorted(chub_build_dir.rglob("*"), key=lambda p: p.relative_to(chub_build_dir).as_posix()):
+            if file_path.resolve() == Path(chub_archive_path).resolve():
+                continue
             arcname = file_path.relative_to(chub_build_dir)
             zf.write(file_path, arcname)
     return chub_archive_path
@@ -181,10 +183,10 @@ def validate_chub_structure(chub_build_dir: Path,
 
     # 2. Confirm no leftover junk in libs/scripts
     libs = chub_build_dir / CHUB_LIBS_DIR
-    scripts = chub_build_dir / CHUB_SCRIPTS_DIR
     if libs.exists() and any(p.is_file() for p in libs.iterdir()):
         raise FileExistsError(f"libs/ in {chub_build_dir} is not empty")
-    if scripts.exists() and any(p.is_file() for p in libs.iterdir()):
+    scripts = chub_build_dir / CHUB_SCRIPTS_DIR
+    if scripts.exists() and any(p.is_file() for p in scripts.iterdir()):
         raise FileExistsError(f"scripts/ in {chub_build_dir} is not empty")
 
     # 3. Validate included files
@@ -252,8 +254,9 @@ def build_chub(*,
                 pre=[name for _, name in (pre_install_scripts or [])],
                 post=[name for _, name in (post_install_scripts or [])]),
             metadata=metadata or {})
+    chubconfig_model.validate()
     chubconfig_file = Path(chub_build_dir / CHUBCONFIG_FILENAME).resolve()
-    with chubconfig_file.open("a", encoding="utf-8") as f:
+    with chubconfig_file.open("w+", encoding="utf-8") as f:
         f.write(chubconfig_model.to_yaml())
 
     if chub_path is None:
