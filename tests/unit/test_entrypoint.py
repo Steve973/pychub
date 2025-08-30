@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 
@@ -7,7 +8,7 @@ from pychubby.runtime.actions import entrypoint
 
 def test_none_entrypoint_returns_zero_and_writes_message(tmp_path, capsys):
     python = tmp_path / "bin" / "python"
-    rc = entrypoint._run_entrypoint_with_python(python, None, ["--flag"])  # stderr message is user-facing
+    rc = entrypoint._run_entrypoint_with_python(python, False, None, ["--flag"])  # stderr message is user-facing
     captured = capsys.readouterr()
     assert rc == 0
     assert "pychubby: no entrypoint to run; installation complete." in captured.err
@@ -25,14 +26,18 @@ def test_module_function_invokes_spawnv_with_python_dash_c(monkeypatch, tmp_path
 
     monkeypatch.setattr(os, "spawnv", fake_spawnv)
 
-    rc = entrypoint._run_entrypoint_with_python(python, "pkg.mod:main", ["--a", "1"])
+    rc = entrypoint._run_entrypoint_with_python(python, False, "pkg.mod:main", ["--a", "1"])
     assert rc == 3
     assert calls["file"] == str(python)
     assert calls["args"][0] == str(python)
     assert calls["args"][1] == "-c"
+
     code = calls["args"][2]
     assert "importlib.import_module('pkg.mod')" in code
-    assert "getattr(mod,'main')" in code
+    # whitespace-insensitive match for getattr(mod,'main')
+    assert re.search(r"getattr\(mod\s*,\s*'main'\)", code)
+
+    # prove argv passthrough is preserved after the code string
     assert calls["args"][3:] == ["--a", "1"]
 
 
@@ -56,7 +61,7 @@ def test_console_script_uses_local_bin_when_present(monkeypatch, tmp_path):
     monkeypatch.setattr(os, "spawnv", fake_spawnv)
     monkeypatch.setattr(os, "spawnvp", fake_spawnvp)
 
-    rc = entrypoint._run_entrypoint_with_python(python, "mytool", ["-x"])
+    rc = entrypoint._run_entrypoint_with_python(python, False, "mytool", ["-x"])
     assert rc == 0
     assert called["file"] == str(script)
     assert called["args"] == [str(script), "-x"]
@@ -80,7 +85,7 @@ def test_console_script_prefers_exe_on_windows(monkeypatch, tmp_path):
     monkeypatch.setattr(os, "spawnv", fake_spawnv)
     monkeypatch.setattr(os, "name", "nt", raising=False)
 
-    rc = entrypoint._run_entrypoint_with_python(python, "mytool", ["--v"])
+    rc = entrypoint._run_entrypoint_with_python(python, False, "mytool", ["--v"])
     assert rc == 7
     assert called["file"] == str(exe)
     assert called["args"] == [str(exe), "--v"]
@@ -105,7 +110,7 @@ def test_console_script_falls_back_to_spawnvp_when_missing_local(monkeypatch, tm
     monkeypatch.setattr(os, "spawnv", fake_spawnv)
     monkeypatch.setattr(os, "spawnvp", fake_spawnvp)
 
-    rc = entrypoint._run_entrypoint_with_python(python, "cli-tool", ["--flag", "1"])
+    rc = entrypoint._run_entrypoint_with_python(python, False, "cli-tool", ["--flag", "1"])
     assert rc == 42
     assert called["file"] == "cli-tool"
     assert called["args"] == ["cli-tool", "--flag", "1"]

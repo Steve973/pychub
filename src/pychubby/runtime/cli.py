@@ -71,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("-u", "--unpack",
                    nargs="?",
+                   const="",
                    metavar="DIR",
                    help=(
                        "Extract .chubconfig and all wheel-related files; if "
@@ -79,9 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
                    ))
 
     p.add_argument("--venv",
-                   metavar="PATH",
+                   metavar="DIR",
                    help=(
-                       "Create a venv at PATH and install wheels into it"
+                       "Create a venv at DIR and install wheels into it"
                    ))
 
     p.add_argument("--version",
@@ -106,5 +107,3 @@ def build_parser() -> argparse.ArgumentParser:
 if __name__ == "__main__":  # pragma: no cover
     parser = build_parser()
     args = parser.parse_args()
-    # Printing parsed args can help manual testing; keep disabled by default.
-    # print(args)

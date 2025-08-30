@@ -128,6 +128,7 @@ def main():
         "-o",
         "--post-script",
         nargs="+",
+        action="append",
         metavar="POST_SCRIPT",
         help="Post-install scripts to include and run")
 
@@ -135,8 +136,9 @@ def main():
         "-p",
         "--pre-script",
         nargs="+",
+        action="append",
         metavar="PRE_SCRIPT",
-        help="Pre-install scripts to include and run (planned)")
+        help="Pre-install scripts to include and run")
 
     parser.add_argument(
         "--verbose",

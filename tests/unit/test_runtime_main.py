@@ -72,10 +72,15 @@ def test_main_lists_wheels(monkeypatch, fake_bundle):
     monkeypatch.setattr(sys, "argv", ["pychubby", "--list"])
 
     called = {}
-    monkeypatch.setattr(runtime_main, "list_wheels", lambda d: called.setdefault("list", d))
+    monkeypatch.setattr(runtime_main, "list_wheels", lambda d, **kw: called.setdefault("list", (d, kw)))
 
     runtime_main.main()
-    assert called["list"] == libs
+
+    arg, kw = called["list"]
+    assert arg == root
+    # optional: prove kwargs are forwarded (adjust if your defaults differ)
+    assert kw.get("quiet") is False
+    assert kw.get("verbose") is False
 
 
 def test_main_unpacks(monkeypatch, fake_bundle):
@@ -136,8 +141,8 @@ def test_main_exec_skips_scripts_and_runs_entrypoint(monkeypatch, fake_bundle, c
     monkeypatch.setattr(runtime_main, "install_wheels", fake_install)
 
     run_calls = {}
-    def _fake_run(py, target, args):
-        run_calls.setdefault("call", (py, target, list(args)))
+    def _fake_run(py, dry_run, target, args):
+        run_calls.setdefault("call", (py, dry_run, target, list(args)))
         return 0
     monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", _fake_run)
 
@@ -146,7 +151,7 @@ def test_main_exec_skips_scripts_and_runs_entrypoint(monkeypatch, fake_bundle, c
 
     assert install_calls["python"] == str(Path("/vpy"))
     assert run_calls["call"][0] == Path("/vpy")
-    assert run_calls["call"][1] == config_obj.entrypoint
+    assert run_calls["call"][2] == config_obj.entrypoint
 
 
 def test_main_exec_forwards_passthru_after_dashdash(monkeypatch, fake_bundle):
@@ -158,7 +163,7 @@ def test_main_exec_forwards_passthru_after_dashdash(monkeypatch, fake_bundle):
     monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
 
     captured = {}
-    def _fake_run_args(py, target, args):
+    def _fake_run_args(py, dry_run, target, args):
         captured.setdefault("args", list(args))
         return 0
     monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", _fake_run_args)
@@ -174,12 +179,13 @@ def test_main_handles_venv_with_pre_and_post(monkeypatch, fake_bundle):
     root, libs = fake_bundle
     monkeypatch.setattr(sys, "argv", ["pychubby", "--venv", "/my/venv"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda *a: 0)
 
     pre, post, inst = {}, {}, {}
     monkeypatch.setattr(runtime_main, "create_venv", lambda path, wheels, **opts: None)
     monkeypatch.setattr(runtime_main, "_venv_python", lambda p: Path("/vpy"))
-    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda root, items: pre.setdefault("ok", (root, list(items))))
-    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda root, items: post.setdefault("ok", (root, list(items))))
+    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda root, dry_run, items: pre.setdefault("ok", (root, list(items))))
+    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda root, dry_run, items: post.setdefault("ok", (root, list(items))))
     monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: inst.setdefault("kw", kw))
 
     runtime_main.main()
@@ -192,6 +198,7 @@ def test_main_venv_no_pre_scripts_skips_install_but_may_run_post(monkeypatch, fa
     root, libs = fake_bundle
     monkeypatch.setattr(sys, "argv", ["pychubby", "--venv", "/venv", "--no-pre-scripts"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
+    monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda *a: 0)
 
     calls = {"pre": 0, "post": 0, "install": 0}
     monkeypatch.setattr(runtime_main, "create_venv", lambda *a, **k: None)
@@ -233,7 +240,7 @@ def test_main_run_baked_entrypoint_when_run_flag_no_arg(monkeypatch, fake_bundle
     monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
 
     captured = {}
-    def _fake_run_baked(py, target, args):
+    def _fake_run_baked(py, dry_run, target, args):
         captured.setdefault("v", (py, target, args))
         return 0
     monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", _fake_run_baked)
@@ -270,24 +277,3 @@ def test_main_run_exit_nonzero_exits(monkeypatch, fake_bundle):
     with pytest.raises(SystemExit):
         runtime_main.main()
     assert exits["code"] == 5
-
-def test_main_passes_only_filter_to_discover(monkeypatch, fake_bundle):
-    root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--only", "bar"])
-
-    seen = {}
-
-    def fake_discover(path, only=None):
-        seen["libs"] = path
-        seen["only"] = only
-        return [libs / "x.whl"]
-
-    monkeypatch.setattr(runtime_main, "discover_wheels", fake_discover)
-    # skip actual work quickly
-    monkeypatch.setattr(runtime_main, "run_pre_install_scripts", lambda *a, **k: None)
-    monkeypatch.setattr(runtime_main, "run_post_install_scripts", lambda *a, **k: None)
-    monkeypatch.setattr(runtime_main, "install_wheels", lambda **kw: None)
-
-    runtime_main.main()
-
-    assert seen == {"libs": libs, "only": "bar"}

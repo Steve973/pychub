@@ -30,7 +30,7 @@ def test_post_install_runs_success(monkeypatch, tmp_path):
     monkeypatch.setattr(install_hooks.subprocess, "run", fake_run)
 
     scripts = ["ok.sh"]
-    install_hooks.run_post_install_scripts(tmp_path, scripts)
+    install_hooks.run_post_install_scripts(tmp_path, False, scripts)
 
     # resolved absolute path and proper flags
     path = Path(calls["cmd"][0])
@@ -51,7 +51,7 @@ def test_pre_install_runs_success(monkeypatch, tmp_path):
 
     monkeypatch.setattr(install_hooks.subprocess, "run", fake_run)
 
-    install_hooks.run_pre_install_scripts(tmp_path, ["prep.sh"])
+    install_hooks.run_pre_install_scripts(tmp_path, False, ["prep.sh"])
     assert recorded == ["prep.sh"]
 
 
@@ -59,7 +59,7 @@ def test_pre_install_runs_success(monkeypatch, tmp_path):
 
 def test_warns_if_missing_script(tmp_path, capsys):
     # no file created on purpose
-    install_hooks.run_post_install_scripts(tmp_path, ["missing.sh"])
+    install_hooks.run_post_install_scripts(tmp_path, False, ["missing.sh"])
     err = capsys.readouterr().err
     assert "[warn]" in err and "post-install script not found" in err
     assert "missing.sh" in err
@@ -85,7 +85,7 @@ def test_exits_with_return_code_on_failure(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(install_hooks.sys, "exit", fake_exit)
 
     with pytest.raises(SystemExit):
-        install_hooks.run_post_install_scripts(tmp_path, ["bad.sh"])
+        install_hooks.run_post_install_scripts(tmp_path, False, ["bad.sh"])
 
     err = capsys.readouterr().err
     assert "[error]" in err and "post-install script failed" in err
@@ -114,7 +114,7 @@ def test_runs_multiple_sorted_and_stops_on_first_failure(monkeypatch, tmp_path):
 
     with pytest.raises(SystemExit):
         # unsorted input on purpose; function sorts first
-        install_hooks.run_pre_install_scripts(tmp_path, ["c.sh", "b.sh", "a.sh"])
+        install_hooks.run_pre_install_scripts(tmp_path, False, ["c.sh", "b.sh", "a.sh"])
 
     # must run in lexicographic order a -> b -> c, and stop at c
     assert seen == ["a.sh", "b.sh", "c.sh"]
@@ -129,7 +129,7 @@ def test_sorts_input_list_in_place(monkeypatch, tmp_path):
     monkeypatch.setattr(install_hooks.subprocess, "run", lambda *a, **k: type("R", (), {"returncode": 0})())
 
     items = ["z.sh", "y.sh"]
-    install_hooks.run_post_install_scripts(tmp_path, items)
+    install_hooks.run_post_install_scripts(tmp_path, False, items)
     assert items == ["y.sh", "z.sh"]
 
 
@@ -138,13 +138,13 @@ def test_sorts_input_list_in_place(monkeypatch, tmp_path):
 def test_wrappers_delegate_correct_type(monkeypatch, tmp_path):
     passed = []
 
-    def spy(root, kind, scripts):
+    def spy(root, dry_run, kind, scripts):
         passed.append((root, kind, list(scripts)))
 
     monkeypatch.setattr(install_hooks, "run_install_scripts", spy)
 
-    install_hooks.run_post_install_scripts(tmp_path, ["p.sh"])
-    install_hooks.run_pre_install_scripts(tmp_path, ["r.sh"])
+    install_hooks.run_post_install_scripts(tmp_path, False, ["p.sh"])
+    install_hooks.run_pre_install_scripts(tmp_path, False, ["r.sh"])
 
     kinds = [k for _, k, _ in passed]
     assert kinds == [install_hooks.CHUB_POST_INSTALL_SCRIPTS_DIR, install_hooks.CHUB_PRE_INSTALL_SCRIPTS_DIR]

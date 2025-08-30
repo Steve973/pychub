@@ -434,20 +434,13 @@ selected by `--run` (or the baked‑in entrypoint if none is provided).
 | `--run [ENTRYPOINT]` | `-r`       | Run the baked-in or specified `ENTRYPOINT`         |
 | `--show-scripts`     | `-s`       | Show the pre/post install scripts and exit         |
 | `--unpack [DIR]`     | `-u`       | Extract `.chubconfig` and all wheel-related files  |
-| `--venv PATH`        |            | Create a venv and install wheels into it           |
+| `--venv DIR`         |            | Create a venv and install wheels into it           |
 | `--version`          |            | Show version info and exit                         |
 | `--verbose`          | `-v`       | Extra logs wherever possible                       |
 
 Notes:
 - `--dry-run`:
   - Prevents any changes from being made to the environment.
-  - Compatible with:
-    - `--no-post-scripts`
-    - `--no-pre-scripts`
-    - `--no-scripts`
-    - `--run`
-    - `--unpack`
-    - `--venv`
 - `--exec`:
   - Runs as an ephemeral venv installation that is wiped after execution.
   - Runs in a **strictly temporary** venv.
@@ -455,8 +448,6 @@ Notes:
   - State is not preserved between runs.
   - Since no state is preserved, this option implies `--no-scripts`
     (i.e., `--no-pre-scripts` and `--no-post-scripts`)
-  - Compatible with:
-    - `--run [ENTRYPOINT]`
 - `--help`:
   - Shows help and exit.
 - `--info`:
@@ -480,10 +471,6 @@ Notes:
   - Skips pre-install scripts.
 - `--no-scripts`:
   - Implies `--no-post-scripts` and `--no-pre-scripts`.
-  - Compatible with:
-    - `--dry-run`
-    - `--run [ENTRYPOINT]`
-    - `--venv` (for persistent venv)
 - `-q`, `--quiet`:
   - Overrides `--verbose`.
   - Compatible with any other option, though results may vary.
@@ -497,12 +484,8 @@ Notes:
     - `console-script-name`
   - To pass arguments to the entrypoint, place them **after** `--` so
     pychubby does not interpret them.
-  - Compatible with:
-    - `--dry-run`
+  - Virtual environment option compatibility:
     - `--exec` (for ephemeral venv)
-    - `--no-post-scripts`
-    - `--no-pre-scripts`
-    - `--no-scripts`
     - `--venv` (for persistent venv)
 - `--show-scripts`:
   - Allows verification of arbitrary pre/post install script content.
@@ -511,24 +494,38 @@ Notes:
   - Specify a directory as `DIR` to extract to the specified directory.
   - If no directory is specified, the current working directory is used, and
     a directory derived from the `.chub` file name is created.
-  - Compatible with:
-    - `--dry-run`
 - `--version`:
   - Shows version information, regardless of verbosity, (then exits) for:
     - current environment's Python interpreter
     - pychubby
     - bundled wheels
-- `--venv PATH`:
-  - Creates a virtual environment at path `PATH` and installs wheels into it.
-  - Compatible with:
-    - `--dry-run`
-    - `--no-post-scripts`
-    - `--no-pre-scripts`
-    - `--no-scripts`
-    - `--run`
+- `--venv DIR`:
+  - Creates a virtual environment at path `DIR` and installs wheels into it.
 - `--verbose`:
   - Ignored if `--quiet` is used.
   - Compatible with any other option, though results may vary.
+
+# Runtime Options Compatibility Matrix
+
+This table is a helpful compatibility matrix for runtime options.
+
+|                   | `dry-run` | `exec` | `help` | `info` | `list` | `no-post-scripts` | `no-pre-scripts` | `no-scripts` | `quiet` | `run` | `show-scripts` | `unpack` | `venv` | `version` | `verbose` |
+|-------------------|-----------|--------|--------|--------|--------|-------------------|------------------|--------------|---------|-------|----------------|----------|--------|-----------|-----------|
+| `dry-run`         | —         | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | Yes      | Yes    | No        | Yes       |
+| `exec`            | Yes       | —      | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | No       | No     | No        | Yes       |
+| `help`            | No        | No     | —      | No     | No     | No                | No               | No           | No      | No    | No             | No       | No     | No        | No        |
+| `info`            | No        | No     | No     | —      | Yes    | No                | No               | No           | Yes     | No    | No             | No       | No     | No        | Yes       |
+| `list`            | No        | No     | No     | Yes    | —      | No                | No               | No           | Yes     | No    | No             | No       | No     | No        | Yes       |
+| `no-post-scripts` | Yes       | Yes    | No     | No     | No     | —                 | Yes              | Yes          | Yes     | Yes   | No             | No       | Yes    | No        | Yes       |
+| `no-pre-scripts`  | Yes       | Yes    | No     | No     | No     | Yes               | —                | Yes          | Yes     | Yes   | No             | No       | Yes    | No        | Yes       |
+| `no-scripts`      | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | —            | Yes     | Yes   | No             | No       | Yes    | No        | Yes       |
+| `quiet`           | Yes       | Yes    | No     | Yes    | Yes    | Yes               | Yes              | Yes          | —       | Yes   | No             | Yes      | Yes    | Yes       | Yes       |
+| `run`             | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | —     | No             | No       | Yes    | No        | Yes       |
+| `show-scripts`    | No        | No     | No     | No     | No     | No                | No               | No           | No      | No    | —              | No       | No     | No        | No        |
+| `unpack`          | Yes       | No     | No     | No     | No     | No                | No               | No           | Yes     | No    | No             | —        | No     | No        | Yes       |
+| `venv`            | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | No       | —      | No        | Yes       |
+| `version`         | No        | No     | No     | No     | No     | No                | No               | No           | Yes     | No    | No             | No       | No     | —         | Yes       |
+| `verbose`         | Yes       | Yes    | No     | Yes    | Yes    | Yes               | Yes              | Yes          | Yes     | Yes   | No             | Yes      | Yes    | Yes       | —         |
 
 #### Example Usage (runtime)
 

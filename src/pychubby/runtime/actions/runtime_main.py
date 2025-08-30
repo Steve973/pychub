@@ -18,6 +18,7 @@ from .version import show_version
 from ..cli import build_parser
 from ..constants import CHUB_LIBS_DIR
 from ..utils import die
+from ..options_processor import validate_and_imply
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -25,8 +26,12 @@ def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     # We use parse_known_args so args after "--" fall into `passthru`.
     args, passthru = parser.parse_known_args(argv)
-    if passthru and passthru[0] == "--":
-        passthru = passthru[1:]
+    ep_argv = passthru[1:] if (passthru and passthru[0] == "--") else (passthru or [])
+
+    try:
+        args = validate_and_imply(args)
+    except ValueError as e:
+        die(str(e))
 
     # Detect if we're inside a .chub archive
     cur_file = Path(__file__)
@@ -47,13 +52,9 @@ def main(argv: list[str] | None = None) -> None:
     libs_dir = (bundle_root / CHUB_LIBS_DIR).resolve()
     baked_entrypoint = bundle_config.entrypoint
 
-    # --exec implies --no-scripts per README
-    if getattr(args, "exec", False):
-        args.no_scripts = True
-
     # Simple info actions
     if getattr(args, "list", False):
-        list_wheels(libs_dir)
+        list_wheels(bundle_root, quiet=args.quiet, verbose=args.verbose)
         return
 
     if getattr(args, "unpack", None):
@@ -67,12 +68,11 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     # Discover wheel files bundled in this archive
-    only = getattr(args, "only", None)
-    wheels = discover_wheels(libs_dir, only=only)
+    wheels = discover_wheels(libs_dir)
     if not wheels:
         die("no wheels found in bundle")
 
-    # --venv PATH performs a persistent install and returns
+    # --venv DIR performs a persistent install and returns
     if getattr(args, "venv", None):
         venv_path = Path(args.venv)
         create_venv(
@@ -84,18 +84,21 @@ def main(argv: list[str] | None = None) -> None:
         vpy = _venv_python(venv_path)
 
         if (not getattr(args, "no_scripts", False)) and (not getattr(args, "no_pre_scripts", False)):
-            run_pre_install_scripts(bundle_root, bundle_config.scripts.pre or [])
+            run_pre_install_scripts(bundle_root, args.dry_run, bundle_config.scripts.pre or [])
             install_wheels(
                 wheels=wheels,
                 dry_run=getattr(args, "dry_run", False),
                 quiet=getattr(args, "quiet", False),
                 verbose=getattr(args, "verbose", False),
-                no_deps=getattr(args, "no_deps", False),
                 python=str(vpy))
 
         if (not getattr(args, "no_scripts", False)) and (not getattr(args, "no_post_scripts", False)):
-            run_post_install_scripts(bundle_root, bundle_config.scripts.post or [])
+            run_post_install_scripts(bundle_root, args.dry_run, bundle_config.scripts.post or [])
 
+        target = baked_entrypoint if (args.run in (None, "")) else args.run
+        code = _run_entrypoint_with_python(vpy, args.dry_run, target, ep_argv)
+        if code != 0:
+            die(code)
         return
 
     # decide if we should run after installation
@@ -104,23 +107,22 @@ def main(argv: list[str] | None = None) -> None:
     # Non-ephemeral install into current env
     if not getattr(args, "exec", False):
         if not getattr(args, "no_scripts", False) and not getattr(args, "no_pre_scripts", False):
-            run_pre_install_scripts(bundle_root, bundle_config.scripts.pre or [])
+            run_pre_install_scripts(bundle_root, args.dry_run, bundle_config.scripts.pre or [])
         install_wheels(
             wheels=wheels,
             dry_run=getattr(args, "dry_run", False),
             quiet=getattr(args, "quiet", False),
             verbose=getattr(args, "verbose", False),
-            no_deps=getattr(args, "no_deps", False),
             python=None)
         if (not getattr(args, "no_scripts", False)) and (not getattr(args, "no_post_scripts", False)):
-            run_post_install_scripts(bundle_root, bundle_config.scripts.post or [])
+            run_post_install_scripts(bundle_root, args.dry_run, bundle_config.scripts.post or [])
         if should_run:
             # resolve target: runtime override wins; empty string means
             # no-arg --run → baked entrypoint
             target = baked_entrypoint if (args.run in (None, "")) else args.run
-            code = _run_entrypoint_with_python(Path(sys.executable), target, passthru)
+            code = _run_entrypoint_with_python(Path(sys.executable), args.dry_run, target, ep_argv)
             if code != 0:
-                sys.exit(code)
+                die(code)
         return
 
     # Ephemeral install: create temp venv, install into it, run, cleanup
@@ -139,13 +141,12 @@ def main(argv: list[str] | None = None) -> None:
             dry_run=getattr(args, "dry_run", False),
             quiet=getattr(args, "quiet", False),
             verbose=getattr(args, "verbose", False),
-            no_deps=getattr(args, "no_deps", False),
             python=str(vpy))
         # resolve the target as above
         target = baked_entrypoint if (args.run in (None, "")) else args.run
-        code = _run_entrypoint_with_python(vpy, target, passthru)
+        code = _run_entrypoint_with_python(vpy, args.dry_run, target, ep_argv)
         if code != 0:
-            sys.exit(code)
+            die(code)
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 

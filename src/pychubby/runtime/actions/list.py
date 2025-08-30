@@ -26,10 +26,21 @@ def list_wheels(bundle_root: Path, *, quiet: bool = False, verbose: bool = False
     # Preferred: read the resolved closure from the config
     if cfg and cfg.wheels:
         lines: list[str] = []
-        for wheel, deps in cfg.wheels.items():  # preserves insertion order
-            lines.append(f"{wheel}:")
-            for dep in deps:
-                lines.append(f"  - {dep}")
+        if quiet:
+           for wheel, deps in cfg.wheels.items():
+                lines.append(f"w:{wheel}, d:{len(deps)}")
+        else:
+            for wheel, deps in cfg.wheels.items():  # preserves insertion order
+                if verbose:
+                    lines.append(f"Wheel: {wheel}")
+                    if deps:
+                        lines.append("  Deps:")
+                        for dep in deps:
+                            lines.append(f"  - {dep}")
+                else:
+                    lines.append(f"{wheel}")
+                    for dep in deps:
+                        lines.append(f"{dep}")
         if lines:
             _print_lines(lines)
         elif not quiet:

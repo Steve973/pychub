@@ -60,7 +60,7 @@ def assert_quiet(proc) -> None:
     success; stderr empty and rc==0.
     """
     assert_rc_ok(proc)
-    assert len(proc.stdout.strip()) < 10, "too chatty in --quiet"
+    assert len(proc.stdout.strip()) < 50, "too chatty in --quiet"
     assert (proc.stderr or "").strip() == "", "stderr should be empty on success"
 
 

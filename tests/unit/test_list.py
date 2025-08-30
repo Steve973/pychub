@@ -59,12 +59,12 @@ def test_list_wheels_with_config_preserves_order_and_deps(monkeypatch, tmp_path,
 
     out = capsys.readouterr().out.strip().splitlines()
     assert out == [
-        "A.whl:",
-        "  - dep1.whl",
-        "  - dep2.whl",
-        "B.whl:",
-        "C.whl:",
-        "  - x.whl",
+        "A.whl",
+        "dep1.whl",
+        "dep2.whl",
+        "B.whl",
+        "C.whl",
+        "x.whl",
     ]
 
 
@@ -74,7 +74,7 @@ def test_list_wheels_with_config_only_top_level_when_no_deps(monkeypatch, tmp_pa
 
     list_action.list_wheels(tmp_path)
     out = capsys.readouterr().out.strip().splitlines()
-    assert out == ["Solo.whl:"]
+    assert out == ["Solo.whl"]
 
 
 def test_list_wheels_with_empty_config_falls_back_to_libs(monkeypatch, tmp_path, capsys):

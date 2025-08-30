@@ -15,7 +15,8 @@ from .constants import (
     RUNTIME_DIR,
     CHUB_POST_INSTALL_SCRIPTS_DIR,
     CHUB_PRE_INSTALL_SCRIPTS_DIR,
-    CHUB_BUILD_DIR_STRUCTURE)
+    CHUB_BUILD_DIR_STRUCTURE,
+    CHUB_INCLUDES_DIR)
 from ..model.chubconfig_model import ChubConfig, Scripts
 
 
@@ -64,11 +65,12 @@ def copy_included_files(chub_base: Path, included_files: list[str] | []) -> None
         if not src.is_file():
             raise FileNotFoundError(f"Included file not found: {src_str}")
 
-        dest_path = (chub_base / dest_str).resolve() if dest_str else (chub_base / src.name).resolve()
+        includes_dir = chub_base / CHUB_INCLUDES_DIR
+        dest_path = (includes_dir / dest_str).resolve() if dest_str else (includes_dir / src.name).resolve()
 
         # Prevent directory traversal
-        if not str(dest_path).startswith(str(chub_base)):
-            raise ValueError(f"Destination '{dest_path}' escapes chub build directory")
+        if not str(dest_path).startswith(str(includes_dir)):
+            raise ValueError(f"Destination '{dest_path}' escapes chub includes directory '{includes_dir}'")
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest_path)

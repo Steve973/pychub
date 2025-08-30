@@ -14,7 +14,7 @@ from pychubby.package.constants import (
     CHUB_POST_INSTALL_SCRIPTS_DIR,
     CHUB_PRE_INSTALL_SCRIPTS_DIR,
     CHUBCONFIG_FILENAME,
-    RUNTIME_DIR,
+    RUNTIME_DIR, CHUB_INCLUDES_DIR,
 )
 
 
@@ -65,11 +65,13 @@ def test_copy_included_files_noop_on_none_and_empty(tmp_path):
 def test_copy_included_files_basic_and_with_dest(tmp_path):
     base = tmp_path / "base"
     base.mkdir()
-    src1 = tmp_path / "f1.txt"; src1.write_text("1")
-    src2 = tmp_path / "f2.txt"; src2.write_text("2")
+    src1 = base / "f1.txt"
+    src1.write_text("1")
+    src2 = base / "f2.txt"
+    src2.write_text("2")
     packager.copy_included_files(base, [str(src1), f"{src2}::data/inside.txt"])
     assert (base / "f1.txt").read_text() == "1"
-    assert (base / "data" / "inside.txt").read_text() == "2"
+    assert (base / CHUB_INCLUDES_DIR / "data" / "inside.txt").read_text() == "2"
 
 def test_copy_included_files_missing_raises(tmp_path):
     base = tmp_path / "base"
@@ -82,7 +84,7 @@ def test_copy_included_files_prevent_directory_traversal(tmp_path):
     src = tmp_path / "x.txt"; src.write_text("x")
     with pytest.raises(ValueError) as e:
         packager.copy_included_files(base, [f"{src}::../outside.txt"])
-    assert "escapes chub build directory" in str(e.value)
+    assert "escapes chub includes directory" in str(e.value)
 
 def test_copy_install_scripts_happy(tmp_path):
     base = tmp_path / "build" / CHUB_SCRIPTS_DIR

@@ -56,7 +56,7 @@ def test_env():
         "src_dir": src_dir,
         "test_pkg_dir": test_pkg_dir,
         "wheel_path": wheels[0],
-        "_runtime_created": created
+        "_runtime_created": created,
     }
 
     if created:
@@ -79,19 +79,38 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     if chub_build_dir.exists():
         shutil.rmtree(chub_build_dir)
 
-    args = [str(test_env["python_bin"]), "-m", "pychubby.package.cli", str(wheel_path), "--chub", str(chub_out)]
+    args = [
+        str(test_env["python_bin"]),
+        "-m",
+        "pychubby.package.cli",
+        str(wheel_path),
+        "--chub",
+        str(chub_out),
+    ]
 
     entrypoint = kwargs.get("entrypoint")
     if entrypoint:
         args += ["--entrypoint", entrypoint]
-    scripts = kwargs.get("scripts")
-    if scripts:
-        for script in scripts:
-            args += ["--scripts", script]
+
+    # Includes: --include FILE[::dest]
     includes = kwargs.get("includes")
     if includes:
         for inc in includes:
-            args += ["--includes", inc]
+            args += ["--include", inc]
+
+    # Post-install scripts: --post-script PATH
+    scripts = kwargs.get("scripts_post")
+    if scripts:
+        for script in scripts:
+            args += ["--post-script", script]
+
+    # Pre-install scripts: --pre-script PATH
+    pre_scripts = kwargs.get("scripts_pre")
+    if pre_scripts:
+        for script in pre_scripts:
+            args += ["--pre-script", script]
+
+    # Metadata: --metadata-entry KEY=VALUE
     metadata = kwargs.get("metadata")
     if metadata:
         for k, v in metadata.items():
