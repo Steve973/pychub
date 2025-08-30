@@ -7,7 +7,7 @@ inputs:
   use-poetry:
     description: "true to use Poetry install, false to use pip"
     required: false
-    default: "false"
+    default: "true"
   pytest-path:
     description: "Path passed to pytest (e.g. tests/unit). If empty, caller runs pytest."
     required: false
