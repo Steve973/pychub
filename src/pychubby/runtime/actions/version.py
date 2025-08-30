@@ -1,7 +1,7 @@
 import sys
 import importlib.metadata as im
 
-from pychubby.runtime.actions.discover import discover_wheels
+from .discover import discover_wheels
 
 
 def show_version(libs_dir) -> None:
@@ -13,7 +13,7 @@ def show_version(libs_dir) -> None:
     except im.PackageNotFoundError:
         print("pychubby: (not installed)")
 
-    wheels = discover_wheels(libs_dir, only=None)
+    wheels = discover_wheels(libs_dir)
     print("Bundled wheels:")
     if wheels:
         for w in wheels:

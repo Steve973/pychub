@@ -1,0 +1,54 @@
+name: Python setup + pytest (Poetry optional)
+description: Set up Python, install deps, and optionally run pytest.
+inputs:
+  python:
+    description: Python version (e.g. 3.11)
+    required: true
+  use-poetry:
+    description: "true to use Poetry install, false to use pip"
+    required: false
+    default: "false"
+  pytest-path:
+    description: "Path passed to pytest (e.g. tests/unit). If empty, caller runs pytest."
+    required: false
+    default: ""
+  extra-install:
+    description: "Extra pip packages, space-separated (e.g. 'pytest pyyaml')"
+    required: false
+    default: "pytest"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python }}
+        cache: 'pip'
+        cache-dependency-path: |
+          **/pyproject.toml
+          **/poetry.lock
+          **/requirements*.txt
+
+    - name: Install deps (pip or Poetry)
+      shell: bash
+      run: |
+        python -m pip install -U pip wheel
+        if [[ "${{ inputs.use-poetry }}" == "true" ]]; then
+          pip install -U poetry
+          poetry config virtualenvs.create false
+          poetry install --only main,test
+          # pytest comes from pyproject extras; add if needed:
+          if ! command -v pytest >/dev/null 2>&1; then
+            pip install ${{ inputs.extra-install }}
+          fi
+        else
+          pip install -e . || true
+          pip install ${{ inputs.extra-install }}
+        fi
+        echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> "$GITHUB_ENV"
+
+    - name: Run pytest (optional)
+      if: ${{ inputs.pytest-path != '' }}
+      shell: bash
+      run: |
+        pytest "${{ inputs.pytest-path }}" -q

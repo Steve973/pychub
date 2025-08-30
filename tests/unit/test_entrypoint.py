@@ -1,96 +1,116 @@
-import sys
+import os
+import re
+
 import pytest
-from types import SimpleNamespace
+
 from pychubby.runtime.actions import entrypoint
 
 
-@pytest.fixture
-def fake_entrypoint():
-    def make(name, func):
-        return SimpleNamespace(name=name, group="console_scripts", load=lambda: func)
-    return make
+def test_none_entrypoint_returns_zero_and_writes_message(tmp_path, capsys):
+    python = tmp_path / "bin" / "python"
+    rc = entrypoint._run_entrypoint_with_python(python, False, None, ["--flag"])  # stderr message is user-facing
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "pychubby: no entrypoint to run; installation complete." in captured.err
 
 
-def test__select_console_entrypoint_with_select(monkeypatch, fake_entrypoint):
-    fake_func = lambda: None
-    ep1 = fake_entrypoint("foo", fake_func)
-    ep2 = fake_entrypoint("bar", lambda: None)
+def test_module_function_invokes_spawnv_with_python_dash_c(monkeypatch, tmp_path):
+    python = tmp_path / "venv" / "bin" / "python"
+    calls = {}
 
-    monkeypatch.setattr(entrypoint.im, "entry_points", lambda: SimpleNamespace(select=lambda group: [ep1, ep2]))
+    def fake_spawnv(mode, file, args):
+        calls["mode"] = mode
+        calls["file"] = file
+        calls["args"] = list(args)
+        return 3
 
-    result = entrypoint._select_console_entrypoint("foo")
-    assert result.name == "foo"
-    assert result.load() is fake_func
+    monkeypatch.setattr(os, "spawnv", fake_spawnv)
 
+    rc = entrypoint._run_entrypoint_with_python(python, False, "pkg.mod:main", ["--a", "1"])
+    assert rc == 3
+    assert calls["file"] == str(python)
+    assert calls["args"][0] == str(python)
+    assert calls["args"][1] == "-c"
 
-def test__select_console_entrypoint_with_fallback(monkeypatch, fake_entrypoint):
-    fake_func = lambda: None
-    ep = fake_entrypoint("mytool", fake_func)
+    code = calls["args"][2]
+    assert "importlib.import_module('pkg.mod')" in code
+    # whitespace-insensitive match for getattr(mod,'main')
+    assert re.search(r"getattr\(mod\s*,\s*'main'\)", code)
 
-    class FakeEPs:
-        def select(self, group):
-            raise Exception("nope")
-
-        def __iter__(self):
-            return iter([ep])
-
-    monkeypatch.setattr(entrypoint.im, "entry_points", lambda: FakeEPs())
-
-    result = entrypoint._select_console_entrypoint("mytool")
-    assert result.name == "mytool"
+    # prove argv passthrough is preserved after the code string
+    assert calls["args"][3:] == ["--a", "1"]
 
 
-def test_run_entrypoint_invokes_loaded_function(monkeypatch, fake_entrypoint):
-    called = {}
-
-    def dummy():
-        called["was"] = True
-
-    ep = fake_entrypoint("runme", dummy)
-
-    monkeypatch.setattr(entrypoint, "_select_console_entrypoint", lambda name: ep)
-    monkeypatch.setattr(entrypoint, "die", lambda msg: pytest.fail("die() should not be called"))
-
-    old_argv = sys.argv[:]
-    entrypoint.run_entrypoint("runme", ["--foo", "bar"])
-    assert called["was"]
-    assert sys.argv == ["runme", "--foo", "bar"]
-    sys.argv = old_argv
-
-
-def test_run_entrypoint_fails_if_not_found(monkeypatch):
-    monkeypatch.setattr(entrypoint, "_select_console_entrypoint", lambda name: None)
+def test_console_script_uses_local_bin_when_present(monkeypatch, tmp_path):
+    venv_bin = tmp_path / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    python = venv_bin / "python"
+    script = venv_bin / "mytool"
+    script.write_text("#!/usr/bin/env python")
 
     called = {}
 
-    def fake_die(msg):
-        called["msg"] = msg
-        raise SystemExit(1)
+    def fake_spawnv(mode, file, args):
+        called["file"] = file
+        called["args"] = list(args)
+        return 0
 
-    monkeypatch.setattr(entrypoint, "die", fake_die)
+    def fake_spawnvp(mode, file, args):  # should not be used
+        raise AssertionError("spawnvp should not be called when local script exists")
 
-    with pytest.raises(SystemExit):
-        entrypoint.run_entrypoint("nope", [])
+    monkeypatch.setattr(os, "spawnv", fake_spawnv)
+    monkeypatch.setattr(os, "spawnvp", fake_spawnvp)
 
-    assert "Could not run module 'nope' as a script: No module named nope" in called["msg"]
+    rc = entrypoint._run_entrypoint_with_python(python, False, "mytool", ["-x"])
+    assert rc == 0
+    assert called["file"] == str(script)
+    assert called["args"] == [str(script), "-x"]
 
 
-@pytest.mark.parametrize(
-    "run_arg, baked_arg, expected",
-    [
-        ("cli-main", None, "cli-main"),
-        (None, "default-main", "default-main"),
-    ]
-)
-def test_maybe_run_entrypoint(monkeypatch, run_arg, baked_arg, expected):
+def test_console_script_prefers_exe_on_windows(monkeypatch, tmp_path):
+    scripts = tmp_path / "venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    python = scripts / "python.exe"
+    (scripts / "mytool").write_text("stub")
+    exe = scripts / "mytool.exe"
+    exe.write_text("stub")  # presence should trigger .exe preference
+
     called = {}
 
-    def fake_run_entrypoint(name, args):
-        called["name"] = name
-        called["args"] = args
+    def fake_spawnv(mode, file, args):
+        called["file"] = file
+        called["args"] = list(args)
+        return 7
 
-    monkeypatch.setattr(entrypoint, "run_entrypoint", fake_run_entrypoint)
+    monkeypatch.setattr(os, "spawnv", fake_spawnv)
+    monkeypatch.setattr(os, "name", "nt", raising=False)
 
-    entrypoint.maybe_run_entrypoint(run_arg, baked_arg, ["--x", "1"])
-    assert called["name"] == expected
-    assert called["args"] == ["--x", "1"]
+    rc = entrypoint._run_entrypoint_with_python(python, False, "mytool", ["--v"])
+    assert rc == 7
+    assert called["file"] == str(exe)
+    assert called["args"] == [str(exe), "--v"]
+
+
+@pytest.mark.parametrize("parent_name", ["bin", "Scripts", "other"])  # cover missing local binary and non-venv parent
+def test_console_script_falls_back_to_spawnvp_when_missing_local(monkeypatch, tmp_path, parent_name):
+    parent = tmp_path / "venv" / parent_name
+    parent.mkdir(parents=True)
+    python = parent / "python"
+
+    called = {}
+
+    def fake_spawnv(mode, file, args):  # must not be used without local file
+        raise AssertionError("spawnv should not be called when candidate does not exist")
+
+    def fake_spawnvp(mode, file, args):
+        called["file"] = file
+        called["args"] = list(args)
+        return 42
+
+    monkeypatch.setattr(os, "spawnv", fake_spawnv)
+    monkeypatch.setattr(os, "spawnvp", fake_spawnvp)
+
+    rc = entrypoint._run_entrypoint_with_python(python, False, "cli-tool", ["--flag", "1"])
+    assert rc == 42
+    assert called["file"] == "cli-tool"
+    assert called["args"] == ["cli-tool", "--flag", "1"]

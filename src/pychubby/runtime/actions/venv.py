@@ -4,6 +4,13 @@ import sys
 import venv
 from pathlib import Path
 
+
+def _venv_python(venv_path: Path) -> Path:
+    if os.name == "nt":
+        return venv_path / "Scripts" / "python.exe"
+    return venv_path / "bin" / "python"
+
+
 def create_venv(path: Path, wheels: list[Path], dry_run: bool = False, quiet: bool = False, verbose: bool = False) -> None:
     if dry_run:
         print(f"[dry-run] would create venv at {path}")
@@ -25,7 +32,7 @@ def create_venv(path: Path, wheels: list[Path], dry_run: bool = False, quiet: bo
         cmd += ["-v"]
     cmd += [str(w) for w in wheels]
 
-    result = subprocess.run(cmd, capture_output=not verbose, text=True)
+    result = subprocess.run(cmd, capture_output=not verbose or quiet, text=True)
     if result.returncode != 0:
         sys.stderr.write(result.stderr or "")
         sys.exit(result.returncode)

@@ -1,73 +1,61 @@
 from __future__ import annotations
 
-import importlib
-import importlib.metadata as im
-import runpy
+import os
 import sys
-
-from ..utils import die
-
-
-def _select_console_entrypoint(name: str):
-    eps = im.entry_points()
-    try:
-        cands = list(eps.select(group="console_scripts"))
-    except Exception:
-        cands = [ep for ep in eps if ep.group == "console_scripts"]
-    for ep in cands:
-        if ep.name == name:
-            return ep
-    return None
+from pathlib import Path
 
 
-def _run_module_func(entrypoint: str, args: list[str]) -> bool:
-    """Try to run entrypoint in form 'module:func'."""
-    if ":" not in entrypoint:
-        return False
-    mod_name, func_name = entrypoint.split(":", 1)
-    try:
-        module = importlib.import_module(mod_name)
-        func = getattr(module, func_name)
-    except (ImportError, AttributeError) as e:
-        die(f"Failed to load entrypoint '{entrypoint}': {e}")
-    sys.argv = [entrypoint] + args
-    func()
-    return True
+def _run_entrypoint_with_python(
+        python: Path,
+        dry_run: bool,
+        entrypoint: str | None,
+        argv: list[str],) -> int:
+    """Run entrypoint under a specific interpreter.
 
+    Entry point forms supported by README:
+      1) module:function
+      2) console-script name
+    """
+    if dry_run:
+        print("[dry-run] would run entrypoint:", entrypoint)
+        return 0
+    if entrypoint is None:
+        # Per README: warn and exit 0 when there's nothing to run
+        sys.stderr.write("pychubby: no entrypoint to run; installation complete.\n")
+        return 0
 
-def _run_console_script(entrypoint: str, args: list[str]) -> bool:
-    """Try to run console_scripts entry point."""
-    ep = _select_console_entrypoint(entrypoint)
-    if not ep:
-        return False
-    func = ep.load()
-    sys.argv = [entrypoint] + args
-    func()
-    return True
+    if ":" in entrypoint:
+        mod, func = entrypoint.split(":", 1)
+        code = (
+            "import importlib, sys, inspect\n"
+            f"mod = importlib.import_module({mod!r})\n"
+            f"fn = getattr(mod, {func!r})\n"
+            "argv = list(sys.argv[1:])\n"
+            "params = list(inspect.signature(fn).parameters.values())\n"
+            "POS_ONLY = inspect.Parameter.POSITIONAL_ONLY\n"
+            "POS_OR_KW = inspect.Parameter.POSITIONAL_OR_KEYWORD\n"
+            "VAR_POSITIONAL = inspect.Parameter.VAR_POSITIONAL\n"
+            "has_varargs = any(p.kind == VAR_POSITIONAL for p in params)\n"
+            "positional = [p for p in params if p.kind in (POS_ONLY, POS_OR_KW)]\n"
+            "required = [p for p in positional if p.default is inspect._empty]\n"
+            "call_argv = argv if has_varargs else argv[:len(positional)]\n"
+            "if (not has_varargs) and (len(call_argv) < len(required)):\n"
+            "    call_argv = []\n"
+            "rv = fn(*call_argv)\n"
+            "sys.exit(int(rv) if isinstance(rv, int) else 0)\n"
+        )
+        return os.spawnv(os.P_WAIT, str(python), [str(python), "-c", code, *argv])
 
-
-def _run_module_main(entrypoint: str, args: list[str]) -> bool:
-    """Fallback: attempt to run the module like `python -m module`."""
-    try:
-        sys.argv = [entrypoint] + args
-        runpy.run_module(entrypoint, run_name="__main__")
-        return True
-    except Exception as e:
-        die(f"Could not run module '{entrypoint}' as a script: {e}")
-
-
-def run_entrypoint(entrypoint: str, args: list[str]) -> None:
-    if _run_module_func(entrypoint, args):
-        return
-    if _run_console_script(entrypoint, args):
-        return
-    if _run_module_main(entrypoint, args):
-        return
-    die(f"Could not resolve or execute entrypoint '{entrypoint}'")
-
-
-def maybe_run_entrypoint(run_arg: str | None, baked_entrypoint: str | None, extra_args: list[str]) -> None:
-    if run_arg:
-        run_entrypoint(run_arg, extra_args)
-    elif baked_entrypoint:
-        run_entrypoint(baked_entrypoint, extra_args)
+    # console script path in that interpreter's environment
+    script = entrypoint
+    if python.parent.name in ("bin", "Scripts"):
+        cand = python.parent / script
+        if os.name == "nt":
+            # Prefer .exe if present
+            exe = cand.with_suffix(".exe")
+            if exe.exists():
+                cand = exe
+        if cand.exists():
+            return os.spawnv(os.P_WAIT, str(cand), [str(cand), *argv])
+    # Fallback: rely on PATH of the current process
+    return os.spawnvp(os.P_WAIT, script, [script, *argv])
