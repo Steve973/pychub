@@ -29,9 +29,24 @@ def test_env():
     if not python_bin.exists():
         raise RuntimeError("Could not find venv Python binary")
 
-    subprocess.run([str(python_bin), "-m", "pip", "install", "--upgrade", "poetry"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    subprocess.run([str(python_bin), "-m", "pip", "install", "-e", str(root_dir)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    subprocess.run(["poetry", "build"], cwd=test_pkg_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # install poetry inside the nested venv
+    subprocess.run(
+        [str(python_bin), "-m", "pip", "install", "--upgrade", "poetry"],
+        check=True,
+    )
+
+    # install the project under test
+    subprocess.run(
+        [str(python_bin), "-m", "pip", "install", "-e", str(root_dir)],
+        check=True,
+    )
+
+    # build the test package using poetry from this venv
+    subprocess.run(
+        [str(python_bin), "-m", "poetry", "build"],
+        cwd=test_pkg_dir,
+        check=True,
+    )
 
     wheels = list(dist_dir.glob("*.whl"))
     assert wheels, "No wheel was built"
