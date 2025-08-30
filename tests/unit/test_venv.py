@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from pychubby.runtime.actions import venv as venv_mod
+from tests.utils import CoercingPath
 
 
 # --- Dry run ---
@@ -161,6 +162,7 @@ def test_create_venv_success_messages_posix(monkeypatch, tmp_path, capsys):
 def test_create_venv_success_messages_windows(monkeypatch, tmp_path, capsys):
     # Windows branch uses Scripts dir
     monkeypatch.setattr(venv_mod.os, "name", "nt", raising=False)
+    monkeypatch.setattr(venv_mod, "Path", CoercingPath)
     monkeypatch.setattr(venv_mod.venv, "EnvBuilder", lambda with_pip: type("B", (), {"create": lambda self, p: None})())
 
     wheel = tmp_path / "a.whl"
