@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import pytest
 
@@ -170,7 +169,7 @@ def test_create_venv_success_messages_windows(monkeypatch, tmp_path, capsys):
 
     def fake_run(cmd, **kwargs):
         # Ensure pip path points to Scripts/pip
-        assert Path(cmd[0]).parts[-2] == "Scripts"
+        assert CoercingPath(cmd[0]).parts[-2] == "Scripts"
         return type("R", (), {"returncode": 0, "stderr": ""})()
 
     monkeypatch.setattr(venv_mod.subprocess, "run", fake_run)
