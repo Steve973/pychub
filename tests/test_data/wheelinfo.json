@@ -1,0 +1,117 @@
+{
+  "extras": {
+    "benchmark": [
+      "cloudpickle",
+      "hypothesis",
+      "mypy>=1.11.1",
+      "pympler",
+      "pytest-codspeed",
+      "pytest-mypy-plugins",
+      "pytest-xdist[psutil]",
+      "pytest>=4.3.0"
+    ],
+    "cov": [
+      "cloudpickle",
+      "coverage[toml]>=5.3",
+      "hypothesis",
+      "mypy>=1.11.1",
+      "pympler",
+      "pytest-mypy-plugins",
+      "pytest-xdist[psutil]",
+      "pytest>=4.3.0"
+    ],
+    "dev": [
+      "cloudpickle",
+      "hypothesis",
+      "mypy>=1.11.1",
+      "pre-commit-uv",
+      "pympler",
+      "pytest-mypy-plugins",
+      "pytest-xdist[psutil]",
+      "pytest>=4.3.0"
+    ],
+    "docs": [
+      "cogapp",
+      "furo",
+      "myst-parser",
+      "sphinx",
+      "sphinx-notfound-page",
+      "sphinxcontrib-towncrier",
+      "towncrier"
+    ],
+    "tests": [
+      "cloudpickle",
+      "hypothesis",
+      "mypy>=1.11.1",
+      "pympler",
+      "pytest-mypy-plugins",
+      "pytest-xdist[psutil]",
+      "pytest>=4.3.0"
+    ],
+    "tests-mypy": [
+      "mypy>=1.11.1",
+      "pytest-mypy-plugins"
+    ]
+  },
+  "meta": {
+    "name": "attrs",
+    "provides_extra": [
+      "benchmark",
+      "cov",
+      "dev",
+      "docs",
+      "tests",
+      "tests-mypy"
+    ],
+    "requires_dist": [
+      "cloudpickle; (platform_python_implementation == 'CPython') and extra == 'benchmark'",
+      "hypothesis; extra == 'benchmark'",
+      "mypy>=1.11.1; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'benchmark'",
+      "pympler; extra == 'benchmark'",
+      "pytest-codspeed; extra == 'benchmark'",
+      "pytest-mypy-plugins; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'benchmark'",
+      "pytest-xdist[psutil]; extra == 'benchmark'",
+      "pytest>=4.3.0; extra == 'benchmark'",
+      "cloudpickle; (platform_python_implementation == 'CPython') and extra == 'cov'",
+      "coverage[toml]>=5.3; extra == 'cov'",
+      "hypothesis; extra == 'cov'",
+      "mypy>=1.11.1; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'cov'",
+      "pympler; extra == 'cov'",
+      "pytest-mypy-plugins; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'cov'",
+      "pytest-xdist[psutil]; extra == 'cov'",
+      "pytest>=4.3.0; extra == 'cov'",
+      "cloudpickle; (platform_python_implementation == 'CPython') and extra == 'dev'",
+      "hypothesis; extra == 'dev'",
+      "mypy>=1.11.1; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'dev'",
+      "pre-commit-uv; extra == 'dev'",
+      "pympler; extra == 'dev'",
+      "pytest-mypy-plugins; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'dev'",
+      "pytest-xdist[psutil]; extra == 'dev'",
+      "pytest>=4.3.0; extra == 'dev'",
+      "cogapp; extra == 'docs'",
+      "furo; extra == 'docs'",
+      "myst-parser; extra == 'docs'",
+      "sphinx; extra == 'docs'",
+      "sphinx-notfound-page; extra == 'docs'",
+      "sphinxcontrib-towncrier; extra == 'docs'",
+      "towncrier; extra == 'docs'",
+      "cloudpickle; (platform_python_implementation == 'CPython') and extra == 'tests'",
+      "hypothesis; extra == 'tests'",
+      "mypy>=1.11.1; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'tests'",
+      "pympler; extra == 'tests'",
+      "pytest-mypy-plugins; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'tests'",
+      "pytest-xdist[psutil]; extra == 'tests'",
+      "pytest>=4.3.0; extra == 'tests'",
+      "mypy>=1.11.1; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'tests-mypy'",
+      "pytest-mypy-plugins; (platform_python_implementation == 'CPython' and python_version >= '3.10') and extra == 'tests-mypy'"
+    ],
+    "requires_python": ">=3.8",
+    "version": "25.3.0"
+  },
+  "name": "attrs",
+  "requires_python": ">=3.8",
+  "sha256": "",
+  "size": 0,
+  "tags": [],
+  "version": "25.3.0"
+}

@@ -18,7 +18,7 @@ from .version import show_version
 from ..cli import build_parser
 from ..constants import CHUB_LIBS_DIR
 from ..utils import die
-from ..options_processor import validate_and_imply
+from ..rt_options_processor import validate_and_imply
 
 
 def main(argv: list[str] | None = None) -> None:

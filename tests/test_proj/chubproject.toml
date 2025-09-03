@@ -1,0 +1,12 @@
+chub = "dist/mybundle.chub"
+wheel = "dist/test_pkg-0.1.0-py3-none-any.whl"
+entrypoint = "test_pkg:greet"
+includes = ["includes/README.md::docs/", "includes/test.cfg::conf/", "includes/info.txt::etc/other.txt", "includes/test.txt"]
+
+[scripts]
+pre  = ["scripts/pre_check.sh"]
+post = ["scripts/post_install.sh"]
+
+[metadata]
+maintainer = "you@example.com"
+tags = ["http", "client"]

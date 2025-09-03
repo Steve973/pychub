@@ -51,18 +51,6 @@ def test_env():
     wheels = list(dist_dir.glob("*.whl"))
     assert wheels, "No wheel was built"
 
-    # Test-only shim: make packager's legacy runtime path resolve
-    runtime_real = src_dir / "pychubby" / "runtime"
-    runtime_legacy = src_dir / "pychubby" / "package" / "runtime"
-    created = None
-    if runtime_real.exists() and not runtime_legacy.exists():
-        try:
-            runtime_legacy.symlink_to(runtime_real, target_is_directory=True)
-            created = ("symlink", runtime_legacy)
-        except (OSError, NotImplementedError):
-            shutil.copytree(runtime_real, runtime_legacy)
-            created = ("copy", runtime_legacy)
-
     yield {
         "temp_dir": temp_dir,
         "venv_dir": venv_dir,
@@ -70,16 +58,9 @@ def test_env():
         "root_dir": root_dir,
         "src_dir": src_dir,
         "test_pkg_dir": test_pkg_dir,
-        "wheel_path": wheels[0],
-        "_runtime_created": created,
+        "wheel_path": wheels[0]
     }
 
-    if created:
-        kind, path = created
-        if kind == "symlink" and path.exists():
-            path.unlink()
-        elif kind == "copy" and path.exists():
-            shutil.rmtree(path)
     shutil.rmtree(temp_dir)
 
 
@@ -103,6 +84,10 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
         str(chub_out),
     ]
 
+    chubconfig = kwargs.get("chubproject")
+    if chubconfig:
+        args += ["--chubproject", chubconfig]
+
     entrypoint = kwargs.get("entrypoint")
     if entrypoint:
         args += ["--entrypoint", entrypoint]
@@ -114,9 +99,9 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
             args += ["--include", inc]
 
     # Post-install scripts: --post-script PATH
-    scripts = kwargs.get("scripts_post")
-    if scripts:
-        for script in scripts:
+    post_scripts = kwargs.get("scripts_post")
+    if post_scripts:
+        for script in post_scripts:
             args += ["--post-script", script]
 
     # Pre-install scripts: --pre-script PATH
@@ -129,10 +114,11 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     metadata = kwargs.get("metadata")
     if metadata:
         for k, v in metadata.items():
-            args += ["--metadata-entry", f"{k}={v}"]
+            val = v if isinstance(v, str) else ",".join(v)
+            args += ["--metadata-entry", f"{k}={val}"]
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(test_env["src_dir"])  # ensure `import pychubby` resolves
+    env["PYTHONPATH"] = str(test_env["src_dir"])
 
     result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     return result, chub_out

@@ -1,5 +1,5 @@
 import pytest
-import pychubby.runtime.options_processor as op
+import pychubby.runtime.rt_options_processor as op
 
 from tests.integration._asserts import assert_rc_ok, assert_rc_fail
 from tests.integration.conftest import run_build_cli, run_runtime_cli

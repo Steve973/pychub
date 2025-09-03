@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import hashlib
+import re
+import zipfile
+from collections import defaultdict
+from dataclasses import field
 from email.parser import Parser
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
-import hashlib
-import zipfile
+
+from pychubby.model.dataclass_shim import dataclass
 
 # --------------------------------------------------------------------------
 # Selectors (case-insensitive). Use "A|B" to mean "prefer A, else B".
@@ -34,6 +38,8 @@ WHEEL_SELECTORS: Dict[str, Selector] = {
     "tag": (("Tag",), True),
 }
 
+_EXTR_RE = re.compile(r"""extra\s*==\s*['"]([^'"]+)['"]""")
+
 
 # --------------------------------------------------------------------------
 
@@ -55,6 +61,77 @@ class SourceInfo:
         return m
 
 
+@dataclass(slots=True, frozen=True)
+class ExtrasInfo:
+    """
+    Mapping of extra name -> list of requirement specs (e.g., {'tests': ['pytest>=7', ...]}).
+    """
+    extras: Dict[str, List[str]]
+
+    # ---------- constructors ----------
+    @staticmethod
+    def from_metadata(meta: Mapping[str, Any]) -> "ExtrasInfo":
+        """
+        Build from a wheel's METADATA mapping:
+          - meta['provides_extra'] can be str | [str, ...]
+          - meta['requires_dist'] can be str | [str, ...]
+        """
+        provides = _meta_list(meta.get("provides_extra"))
+        requires = _meta_list(meta.get("requires_dist"))
+
+        return ExtrasInfo.from_lists(provides, requires)
+
+    @staticmethod
+    def from_mapping(m: Mapping[str, List[str]]) -> "ExtrasInfo":
+        return ExtrasInfo(extras={k: list(v) for k, v in (m or {}).items()})
+
+    @staticmethod
+    def from_lists(provides_extra: Iterable[str] | None,
+                   requires_dist: Iterable[str] | None) -> "ExtrasInfo":
+        """
+        Low-level constructor if you've already split values.
+        """
+        declared = {s.strip() for s in _meta_list(provides_extra) if s and s.strip()}
+        reqs = [s.strip() for s in _meta_list(requires_dist) if s and s.strip()]
+
+        grouped: Dict[str, List[str]] = {}
+        buckets: Dict[str, List[str]] = defaultdict(list)
+
+        for r in reqs:
+            spec, marker = _split_req_marker(r)
+            name = _extract_extra_name(marker)
+            if name is None:
+                # no `extra == '...':` -> base dep; ignore for extras mapping
+                # (if you want base deps later, track them in a separate field)
+                continue
+            _append_dedup(buckets[name], spec)
+
+        # Ensure all declared extras exist (even if empty)
+        for name in declared:
+            buckets.setdefault(name, [])
+
+        # Freeze into a plain dict (preserve insertion order)
+        for k, v in buckets.items():
+            grouped[k] = list(v)
+
+        return ExtrasInfo(extras=grouped)
+
+    # ---------- accessors / utils ----------
+    def get(self, name: str) -> List[str]:
+        return list(self.extras.get(name, []))
+
+    def names(self) -> List[str]:
+        return list(self.extras.keys())
+
+    def to_mapping(self) -> Dict[str, List[str]]:
+        return {k: list(v) for k, v in self.extras.items()}
+
+    def __len__(self) -> int:
+        return len(self.extras)
+
+    def __bool__(self) -> bool:
+        return bool(self.extras)
+
 @dataclass(slots=True)
 class WheelInfo:
     filename: str
@@ -65,6 +142,7 @@ class WheelInfo:
     tags: List[str] = field(default_factory=list)        # from WHEEL Tag
     requires_python: Optional[str] = None
     deps: List[str] = field(default_factory=list)        # immediate deps (filenames)
+    extras: ExtrasInfo = field(default_factory=lambda: ExtrasInfo(extras={}))
     source: Optional[SourceInfo] = None
     meta: Dict[str, Any] = field(default_factory=dict)   # normalized METADATA
     wheel: Dict[str, Any] = field(default_factory=dict)  # normalized WHEEL
@@ -81,6 +159,8 @@ class WheelInfo:
             out["requires_python"] = self.requires_python
         if self.deps:
             out["deps"] = list(self.deps)
+        if self.extras:
+            out["extras"] = self.extras.to_mapping()
         if self.source:
             out["source"] = self.source.to_mapping()
         if self.meta:
@@ -101,6 +181,7 @@ class WheelInfo:
             requires_python=(str(m["requires_python"])
                              if m.get("requires_python") else None),
             deps=[str(x) for x in (m.get("deps") or [])],
+            extras=ExtrasInfo.from_mapping(m.get("extras") or {}),
             source=SourceInfo(**m["source"]) if m.get("source") else None,
             meta=dict(m.get("meta") or {}),
             wheel=dict(m.get("wheel") or {}))
@@ -129,7 +210,9 @@ class WheelInfo:
             raise ValueError(f"{p.name}: METADATA missing Name/Version")
 
         tags = list(wheel.get("tag") or [])  # already list
-        requires_python = str(meta.pop("requires_python", None))
+        rp = meta.pop("requires_python", None)
+        requires_python = str(rp) if rp is not None else None
+        extras = ExtrasInfo.from_metadata(meta)
 
         return WheelInfo(
             filename=p.name,
@@ -140,6 +223,7 @@ class WheelInfo:
             tags=tags,
             requires_python=requires_python,
             deps=[str(x) for x in (deps or ())],
+            extras=extras,
             source=source,
             meta=meta,
             wheel={k: v for k, v in wheel.items() if k != "tag"},
@@ -201,14 +285,31 @@ def _select_one(headers: Mapping[str, List[str]], alts: Tuple[str, ...]) -> Opti
                 return str(vals[0])
     return None
 
-
-def meta_list(v: Any) -> List[str]:
+def _meta_list(v: Any) -> List[str]:
     if v is None:
         return []
     if isinstance(v, list):
         return [str(x) for x in v]
     return [str(v)]
 
-
 def meta_str(v: Any) -> Optional[str]:
     return None if v is None else str(v)
+
+def _split_req_marker(req: str) -> Tuple[str, Optional[str]]:
+    """
+    Split 'pkg>=1.2; marker' into ('pkg>=1.2', 'marker'), or ('pkg', None) if no marker.
+    """
+    if ";" in req:
+        spec, marker = req.split(";", 1)
+        return spec.strip(), marker.strip()
+    return req.strip(), None
+
+def _extract_extra_name(marker: Optional[str]) -> Optional[str]:
+    if not marker:
+        return None
+    m = _EXTR_RE.search(marker)
+    return m.group(1) if m else None
+
+def _append_dedup(bucket: List[str], item: str) -> None:
+    if item not in bucket:
+        bucket.append(item)
