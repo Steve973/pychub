@@ -197,26 +197,43 @@ dependencies into a single `.chub` file.
 
     usage: pychubby <wheel> [build options]
 
-| Option             | Short Form | Description                                        | Repeatable |
-|--------------------|------------|----------------------------------------------------|------------|
-| `<wheel>`          | N/A        | Path to the main wheel file to process             | no         |
-| `--add-wheel`      | `-a`       | Optional path to a wheel to add (plus deps)        | yes        |
-| `--chub`           | `-c`       | Optional path to the output `.chub` file           | no         |
-| `--entrypoint`     | `-e`       | Optional entrypoint to run after install           | no         |
-| `--include`        | `-i`       | Optional list of files to include                  | yes        |
-| `--metadata-entry` | `-m`       | Optional metadata to include in `.chubconfig`      | yes        |
-| `--post-script`    | `-o`       | Optional path to post-install script(s) to include | yes        |
-| `--pre-script`     | `-p`       | Optional path to pre-install script(s) to include  | yes        |
-| `--verbose`        | `-v`       | Optionally show more information when building     | no         |
-| `--version`        | n/a        | Show version info and exit                         | no         |
+| Option               | Short Form | Description                                                | Repeatable |
+|----------------------|------------|------------------------------------------------------------|------------|
+| `<wheel>`            | N/A        | Path to the main wheel file to process                     | no         |
+| `--add-wheel`        | `-a`       | Optional path to a wheel to add (plus deps)                | yes        |
+| `--chub`             | `-c`       | Optional path to the output `.chub` file                   | no         |
+| `--chubproject`      | N/A        | Optional path to `chubproject.toml` as build config source | no         |
+| `--chubproject-save` | N/A        | Optional path to write build config to `chubproject.toml`  | no         |
+| `--entrypoint`       | `-e`       | Optional entrypoint to run after install                   | no         |
+| `--include`          | `-i`       | Optional list of files to include                          | yes        |
+| `--metadata-entry`   | `-m`       | Optional metadata to include in `.chubconfig`              | yes        |
+| `--post-script`      | `-o`       | Optional path to post-install script(s) to include         | yes        |
+| `--pre-script`       | `-p`       | Optional path to pre-install script(s) to include          | yes        |
+| `--verbose`          | `-v`       | Optionally show more information when building             | no         |
+| `--version`          | N/A        | Show version info and exit                                 | no         |
 
 Notes:
 - `<wheel>`:
-  - Mandatory argument (except with `--version`).
-  - Any legal path to a wheel file.
+  - Mandatory argument (except with `--add-wheel`, `--chubconfig`, or `--version`).
+  - Accepts an argument of any legal path to a wheel file.
+- `--add-wheel`:
+  - Optional for single invocation, but required when appending wheels to an
+    existing `.chub`.
 - `--chub`:
-  - Optional for single invocation, but required when appending wheels to an existing `.chub`.
+  - Optional for single invocation, but required when appending wheels to an
+    existing `.chub`.
   - Defaults to `<Name>-<Version>.chub` derived from wheel metadata.
+- `--chubproject`:
+  - Optional.
+  - Requires an argument specifying the path to a `chubproject.toml` file.
+  - If specified, matching file entries are overridden by the corresponding
+    values on the command line.
+- `--chubproject-save`:
+  - Optional.
+  - Requires an argument specifying the path to the destination
+    `chubproject.toml` file.
+  - Can be specified along with `--chubproject` to preserve changes if you
+    include additional CLI options and arguments.
 - `--entrypoint`:
   - Optional.
   - The value is a single string, and quoted if it contains spaces.
@@ -407,6 +424,58 @@ can see in the following examples:
          --metadata-entry maintainer:me@example.com,tags:http,client \
          --verbose
     ```
+
+### Configuring a Chub Build With `chubproject.toml`
+
+It may be more convenient to configure a build with a `chubproject.toml` file.
+As you may have guessed, its name is similar to `pyproject.toml`, and it follows
+a format that is identical to what you would use in the `tool` namespace of a
+`pyproject.toml` file.
+
+Here is an example `chubproject.toml` file that includes all possible options,
+and it is a bit similar to the "Everything Together" example above:
+
+```toml
+[package]
+chub = "dist/mybundle.chub"
+wheel = "dist/app-1.2.3.whl"
+entrypoint = "pkg.cli:main"
+add_wheels = ["dist/addon.whl"]
+includes = ["README.md::docs", "config/extra.cfg::conf"]
+
+[scripts]
+pre  = ["scripts/pre_check.sh"]
+post = ["scripts/post_install.sh"]
+
+[metadata]
+maintainer = "you@example.com"
+tags = ["http", "client"]
+```
+
+Notes:
+
+- This example uses the "table" format. TOML syntax also accepts the "inline"
+format, which is a bit more compact. While this *is* valid and acceptable, we
+recommend using the "table" format for clarity. In "inline" format, the previous
+example would be written as:
+  ```toml
+  [package]
+  chub = "dist/mybundle.chub"
+  wheel = "dist/app-1.2.3.whl"
+  entrypoint = "pkg.cli:main"
+  add_wheels = ["dist/addon.whl"]
+  includes = ["README.md::docs", "config/extra.cfg::conf"]
+  scripts = {pre = ["scripts/pre_check.sh"], post = ["scripts/post_install.sh"]}
+  metadata = {maintainer = "you@example.com", tags = ["http", "client"]}
+  ```
+- The `package` namespace is optional. Not only is it optional, but namespaces
+like `tool.pychubby.package` are also permissible. If you do include a namespace
+it must be `package`, `pychubby.package`, or it must end with
+`.pychubby.package` (e.g., `tool.pychubby.package`).
+- Using a `chubproject.toml` file implies that the `.chub` build is one-shot.
+While you *can* append additional wheels to an existing `.chub` file, the file
+entries can only include items at initial build time. If you specify an existing
+`.chub` file in the `chubproject.toml` file, pychubby will exit with an error.
 
 ### Operating a Chub
 
@@ -779,28 +848,16 @@ metadata:
 
 ## Roadmap
 
-| Status      | Feature                    | Notes                                           |
-|-------------|----------------------------|-------------------------------------------------|
-| ☐ Planned   | Quick-start guide          | Convenience for getting started quickly.        |
-| ☐ Planned   | Pre-install hook support   | Would allow setup steps before wheel install.   |
-| ☑ Done      | Post-install hook support  | Runs user-defined scripts after installation.   |
-| ☑ Done      | Metadata via `.chubconfig` | Structured key-value metadata now supported.    |
-| ☑ Done      | Include extra wheels       | Each wheel with resolve dependency wheels.      |
-| ☐ Future    | Digital signature support  | Explore signing chub files for verification.    |
-| ☐ Exploring | Conda support              | Evaluate creating/targeting conda environments. |
-
----
-
-## Items (inconsistencies, contradictions, incompleteness, etc.) to clarify or fix
-
-- [ ] Scope “reproducible install” claim:
-  - define what is reproducible (exact wheel bits) vs what isn’t (platform, environment state)
-  - note if builds use **pinned indexes / hashes**
-- [ ] Cross-platform limits:
-  - expand “wheels must be xplat” with examples (pure-Python, manylinux, universal2) and what fails (platform-specific wheels).
-- [ ] Security callout
-  - warn that `.chub` may contain **arbitrary post-install scripts**
-  - advise verifying publisher/signatures (ties to Roadmap’s signing).
+| Status      | Feature                     | Notes                                                           |
+|-------------|-----------------------------|-----------------------------------------------------------------|
+| In Progress | Support TOML for options    | Read/Write TOML files for options.                              |
+| Planned     | Build tool support          | Support integration with `pyproject.toml`.                      |
+| Planned     | Quick-start guide           | Convenience for getting started quickly.                        |
+| Planned     | Handle dependency conflicts | Provide multiple-version/duplicate-wheel dependency strategies. |
+| Exploring   | c/native support            | Explore facilitating c/native support (maybe with conda).       |
+| Exploring   | Wheel extras support        | Explore handling extras for wheels (w/Requires-Dist).           |
+| Exploring   | Conda support               | Evaluate creating/targeting conda environments.                 |
+| Future      | Digital signature support   | Explore signing chub files for verification.                    |
 
 ---
 

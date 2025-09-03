@@ -1,34 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass as _dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
+from dataclasses import field
 import json
 import yaml
-import sys as _sys
 
-
-# Compatibility shim: Python 3.9 dataclass has no "slots" parameter.
-def dataclass(*args, **kwargs):
-    if _sys.version_info < (3, 10):
-        kwargs.pop("slots", None)
-    return _dataclass(*args, **kwargs)
-
-@dataclass(slots=True, frozen=True)
-class Scripts:
-    pre: List[str] = field(default_factory=list)
-    post: List[str] = field(default_factory=list)
-
-    @staticmethod
-    def from_mapping(m: Mapping[str, Any] | None) -> "Scripts":
-        if not m:
-            return Scripts()
-        pre = [str(x) for x in (m.get("pre") or [])]
-        post = [str(x) for x in (m.get("post") or [])]
-        return Scripts(pre=pre, post=post)
-
-    def to_mapping(self) -> Dict[str, List[str]]:
-        return {"pre": list(self.pre), "post": list(self.post)}
+from pychubby.model.dataclass_shim import dataclass
+from pychubby.model.scripts_model import Scripts
 
 
 @dataclass(slots=True, frozen=True)

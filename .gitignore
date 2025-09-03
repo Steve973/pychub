@@ -1,6 +1,8 @@
 .idea
 .venv
 dist
+udir
+vdir
 chub-build
 __pycache__
 poetry.lock

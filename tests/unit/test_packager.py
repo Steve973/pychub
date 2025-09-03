@@ -6,6 +6,7 @@ import zipfile
 import pytest
 import yaml
 
+from pychubby.model.chubproject_model import ChubProject
 from pychubby.package import packager
 from pychubby.package.constants import (
     CHUB_BUILD_DIR,
@@ -151,7 +152,15 @@ def test_validate_chub_structure_basic(tmp_path):
 
 def test_build_chub_happy_path(monkeypatch, tmp_path):
     # Fake wheel file
-    wheel_path = tmp_path / "pkg-1.0.0-py3-none-any.whl"; wheel_path.write_text("fake")
+    wheel_path = tmp_path / "pkg-1.0.0-py3-none-any.whl"
+    wheel_path.write_text("fake")
+
+    # Create dummy pre/post scripts (note: unprefixed filenames)
+    pre_src = tmp_path / "pre.sh"
+    pre_src.write_text("#!/bin/sh\necho pre\n")
+    post_src = tmp_path / "post.sh"
+    post_src.write_text("#!/bin/sh\necho post\n")
+
     # Spy actions
     actions = []
     monkeypatch.setattr(packager, "verify_pip", lambda: actions.append("verify_pip"))
@@ -164,23 +173,28 @@ def test_build_chub_happy_path(monkeypatch, tmp_path):
     monkeypatch.setattr(packager, "copy_runtime_files", lambda *a, **k: actions.append("runtime"))
     # No deps; just echo download call
     monkeypatch.setattr(packager, "download_wheel_deps", lambda *a, **k: [])
-    # Build
-    out = packager.build_chub(
-        wheel_paths=[wheel_path],
-        chub_path=chub_path,
-        entrypoint="m:f",
-        post_install_scripts=[(wheel_path, "00_post.sh")],
-        pre_install_scripts=[(wheel_path, "00_pre.sh")],
-        included_files=[],
-        metadata={"main_wheel": wheel_path.name})
+
+    # Build project: scripts are PATHS, not final names
+    proj = ChubProject.from_mapping({
+        "wheel": str(wheel_path),
+        "chub": str(chub_path),
+        "entrypoint": "m:f",
+        "scripts": {"post": [str(post_src)], "pre": [str(pre_src)]},
+        "metadata": {"main_wheel": wheel_path.name},
+    })
+
+    out = packager.build_chub(proj)
     assert out == chub_path
+
     # Verify contents on disk (flat)
     with zipfile.ZipFile(out) as z:
         names = set(z.namelist())
     assert f"{CHUB_LIBS_DIR}/{wheel_path.name}" in names
-    assert f"{CHUB_SCRIPTS_DIR}/{CHUB_POST_INSTALL_SCRIPTS_DIR}/00_post.sh" in names
-    assert f"{CHUB_SCRIPTS_DIR}/{CHUB_PRE_INSTALL_SCRIPTS_DIR}/00_pre.sh" in names
-    assert CHUBCONFIG_FILENAME in names
+    post_name = packager.prefixed_script_names([post_src])[0][1]
+    pre_name = packager.prefixed_script_names([pre_src])[0][1]
+    assert f"{CHUB_SCRIPTS_DIR}/{CHUB_POST_INSTALL_SCRIPTS_DIR}/{post_name}" in names
+    assert f"{CHUB_SCRIPTS_DIR}/{CHUB_PRE_INSTALL_SCRIPTS_DIR}/{pre_name}" in names
+
     # Verify .chubconfig shape
     tmp_extract = tmp_path / "x"; tmp_extract.mkdir()
     with zipfile.ZipFile(out) as z:
@@ -190,6 +204,6 @@ def test_build_chub_happy_path(monkeypatch, tmp_path):
     assert data["name"] == "pkg"
     assert data["version"] == "1.0.0"
     assert data["entrypoint"] == "m:f"
-    assert data["scripts"]["post"] == ["00_post.sh"]
-    assert data["scripts"]["pre"] == ["00_pre.sh"]
+    assert data["scripts"]["post"] == [post_name]
+    assert data["scripts"]["pre"] == [pre_name]
     assert list(data["wheels"].keys()) == [wheel_path.name]

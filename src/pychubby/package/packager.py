@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
 import zipfile
 from email.parser import Parser
-from pathlib import Path
+from pathlib import Path, PurePath
+from typing import Union, List
 
 from .constants import (
     CHUB_BUILD_DIR,
@@ -18,6 +20,79 @@ from .constants import (
     CHUB_BUILD_DIR_STRUCTURE,
     CHUB_INCLUDES_DIR)
 from ..model.chubconfig_model import ChubConfig, Scripts
+from ..model.chubproject_model import ChubProject
+
+_ALLOWED = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _sanitize(p: str | PurePath) -> str:
+    parts = [s for s in PurePath(p).parts if s not in ("", ".", "..", "/")]
+    name = "_".join(parts) or "script"
+    name = _ALLOWED.sub("_", name)
+    name = re.sub(r"_+", "_", name).strip("_")
+    return name or "script"
+
+
+def prefixed_script_names(paths: list[str | Path]) -> list[tuple[Path, str]]:
+    """Return (src_path, dest_name) with zero-padded index prefix.
+    Lexical sort preserves input order; width grows when >=100 items.
+    """
+    width = max(2, len(str(max(len(paths) - 1, 0))))
+    seen: dict[str, int] = {}
+    out: list[tuple[Path, str]] = []
+    for i, src in enumerate(paths):
+        base = _sanitize(src)
+        key = base.lower()
+        n = seen.get(key, 0)
+        seen[key] = n + 1
+        if n:  # dedupe while preserving extension
+            stem, dot, ext = base.rpartition(".")
+            base = f"{(stem or base)}({n}){dot}{ext}"
+        out.append((Path(src), f"{i:0{width}d}_{base}"))
+    return out
+
+
+def _flatten(values):
+    """Flatten lists that may be appended by argparse (list[list[str]]).
+    Keeps non-list items as-is.
+    """
+    if not values:
+        return []
+    flat = []
+    for v in values:
+        if isinstance(v, (list, tuple)):
+            flat.extend(v)
+        else:
+            flat.append(v)
+    return flat
+
+
+def _paths(values):
+    """Convert a (possibly nested) list of paths to Path objects.
+    Filters out non-existent files.
+    """
+    out: list[Path] = []
+    for item in _flatten(values):
+        p = Path(item).expanduser().resolve()
+        if p.exists() and p.is_file():
+            out.append(p)
+    return out
+
+
+def _includes(values):
+    """Return raw include strings (preserving `src::dest`).
+    Also validates that `src` exists.
+    """
+    out: list[str] = []
+    for item in _flatten(values):
+        s = str(item)
+        src = s.split("::", 1)[0]
+        p = Path(src).expanduser().resolve()
+        if not p.exists() or not p.is_file():
+            continue
+        # Preserve the original token including ::dest
+        out.append(s)
+    return out
 
 
 def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
@@ -66,7 +141,15 @@ def copy_included_files(chub_base: Path, included_files: list[str] | []) -> None
             raise FileNotFoundError(f"Included file not found: {src_str}")
 
         includes_dir = chub_base / CHUB_INCLUDES_DIR
-        dest_path = (includes_dir / dest_str).resolve() if dest_str else (includes_dir / src.name).resolve()
+        if dest_str and dest_str.endswith(("/", "\\")):
+            # It's a directory target, so append the filename
+            dest_path = (includes_dir / dest_str / src.name).resolve()
+        elif dest_str:
+            # It's a filename target
+            dest_path = (includes_dir / dest_str).resolve()
+        else:
+            # No destination given — default to src.name
+            dest_path = (includes_dir / src.name).resolve()
 
         # Prevent directory traversal
         if not str(dest_path).startswith(str(includes_dir)):
@@ -181,15 +264,15 @@ def verify_pip() -> None:
 
 def validate_files_exist(files: list[str] | [], context: str) -> None:
     for file in files:
-        src = file.split("::", 1)[0]
+        src = file.split("::", 1)[0] if "::" in file else file
         path = Path(src).expanduser().resolve()
         if not path.is_file():
             raise FileNotFoundError(f"{context} file not found: {src}")
 
 
 def validate_chub_structure(chub_build_dir: Path,
-                            post_install_scripts: list[Path] | [],
-                            pre_install_scripts: list[Path] | [],
+                            post_install_scripts: list[str] | [],
+                            pre_install_scripts: list[str] | [],
                             included_files: list[str] | []) -> None:
     # 1. Ensure the build dir exists and has a .chubconfig
     chubconfig_file = chub_build_dir / CHUBCONFIG_FILENAME
@@ -211,28 +294,59 @@ def validate_chub_structure(chub_build_dir: Path,
     # 4. Validate pre- and post-install scripts
     for script_tuple in [("post", post_install_scripts), ("pre", pre_install_scripts)]:
         script_type, scripts = script_tuple
-        if scripts:
-            for s in scripts:
-                if not Path(s).expanduser().resolve().is_file():
-                    raise FileNotFoundError(f"The {script_type}-install script was not found: {s}")
+        validate_files_exist(scripts, context=f"{script_type}-install")
 
 
-def build_chub(*,
-               wheel_paths: list[Path],
-               chub_path: str | Path | None = None,
-               entrypoint: str | None = None,
-               post_install_scripts: list[tuple[Path, str]] | [],
-               pre_install_scripts: list[tuple[Path, str]] | [],
-               included_files: list[str] | [],
-               metadata: dict | None = None) -> Path:
+def absolutize_paths(paths: Union[str, List[str]], base_dir: Path) -> Union[str, List[str]]:
+    """
+    Ensures that each path is absolute. If a path is not absolute, it is joined with base_dir.
+    If a single string is passed, a single string is returned. Otherwise, a list is returned.
+    """
+    is_single = isinstance(paths, str)
+    path_list = [paths] if is_single else paths
+
+    resolved = [
+        str(Path(p)) if Path(p).is_absolute() else str((base_dir / p).resolve())
+        for p in path_list
+    ]
+
+    return resolved[0] if is_single else resolved
+
+def build_chub(chubproject: ChubProject) -> Path:
     verify_pip()
+
+    entrypoint = chubproject.entrypoint
+    metadata = chubproject.metadata or {}
+
+    project_dir = (
+        Path(metadata["__file__"]).parent.resolve()
+        if "__file__" in metadata
+        else Path(".").resolve())
+
+    wheel_paths: list[Path] = []
+    if chubproject.wheel:
+        wheel_paths.append(Path(chubproject.wheel).expanduser().resolve())
+    wheel_paths.extend(_paths(chubproject.add_wheels))
+
+    post_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.post, project_dir)) if chubproject.scripts.post else []
+    pre_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.pre, project_dir)) if chubproject.scripts.pre else []
+
+    includes_raw = chubproject.includes or []
+    included_files = []
+    for inc_mod in includes_raw:
+        inc = inc_mod.as_string()
+        if "::" in inc:
+            src, dest = inc.split("::", 1)
+            included_files.append(f"{absolutize_paths(src, project_dir)}::{dest}")
+        else:
+            included_files.append(f"{absolutize_paths(inc, project_dir)}")
+
+    chub_path = chubproject.chub
 
     if not wheel_paths:
         raise ValueError("No wheels provided")
 
-    metadata = metadata or {}
     main_wheel_name = str(metadata.get("main_wheel", Path(wheel_paths[0]).name))
-    # Find the main wheel path by name; fall back to the first wheel path
     main_wheel_path = next((p for p in wheel_paths if p.name == main_wheel_name), wheel_paths[0])
 
     chub_build_dir = create_chub_build_dir(main_wheel_path, chub_path)
@@ -242,12 +356,11 @@ def build_chub(*,
 
     validate_chub_structure(
         chub_build_dir,
-        [path for path, _ in (post_install_scripts or [])],
-        [path for path, _ in (pre_install_scripts or [])],
+        [str(path) for path, _ in (post_install_scripts or [])],
+        [str(path) for path, _ in (pre_install_scripts  or [])],
         included_files)
 
     wheel_libs_dir = chub_build_dir / CHUB_LIBS_DIR
-
     wheels_map: dict[str, list[str]] = {}
     for wp in wheel_paths:
         shutil.copy2(wp, wheel_libs_dir / wp.name)
@@ -255,20 +368,22 @@ def build_chub(*,
 
     script_base = chub_build_dir / CHUB_SCRIPTS_DIR
     copy_install_scripts(script_base, post_install_scripts, CHUB_POST_INSTALL_SCRIPTS_DIR)
-    copy_install_scripts(script_base, pre_install_scripts, CHUB_PRE_INSTALL_SCRIPTS_DIR)
+    copy_install_scripts(script_base, pre_install_scripts,  CHUB_PRE_INSTALL_SCRIPTS_DIR)
     copy_included_files(chub_build_dir, included_files)
     copy_runtime_files(chub_build_dir)
 
-    chubconfig_model = ChubConfig(
-            name=package_name,
-            version=version,
-            entrypoint=entrypoint,
-            wheels=wheels_map,
-            includes=included_files or [],
-            scripts=Scripts(
-                pre=[name for _, name in (pre_install_scripts or [])],
-                post=[name for _, name in (post_install_scripts or [])]),
-            metadata=metadata or {})
+    chubconfig_model = ChubConfig.from_mapping({
+        "name": package_name,
+        "version": version,
+        "entrypoint": entrypoint,
+        "wheels": wheels_map,
+        "includes": included_files or [],
+        "scripts": {
+            "pre":  [name for _, name in (pre_install_scripts  or [])],
+            "post": [name for _, name in (post_install_scripts or [])],
+        },
+        "metadata": metadata
+    })
     chubconfig_model.validate()
     chubconfig_file = Path(chub_build_dir / CHUBCONFIG_FILENAME).resolve()
     with chubconfig_file.open("w+", encoding="utf-8") as f:

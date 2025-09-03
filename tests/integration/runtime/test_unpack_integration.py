@@ -97,9 +97,10 @@ def test_unpack_includes_are_copied(test_env, tmp_path):
 
 @pytest.mark.integration
 def test_unpack_scripts_are_copied_when_present(test_env, tmp_path):
-    s = tmp_path / "post_ok.py"
+    script_dir = tmp_path / "scr"
+    script_dir.mkdir()
+    s = script_dir / "post_ok.py"
     s.write_text("print('ok')\n")
-
     bproc, chub = run_build_cli(test_env["wheel_path"], tmp_path, test_env, scripts_post=[str(s)])
     assert_rc_ok(bproc)
 

@@ -1,4 +1,4 @@
-# options_processor.py
+# rt_options_processor.py
 
 COMMANDS = [
     "dry-run",

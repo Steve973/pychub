@@ -1,32 +1,56 @@
-[tool.poetry]
+[build-system]
+requires = ["poetry-core>=2.1.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
 name = "pychubby"
 version = "0.1.0"
 description = "Make a Python-native .chub installer from a wheelhouse."
-authors = ["Steve Storck <steve973@gmail.com>"]
 readme = "README.md"
-packages = [
-    { include = "pychubby", from = "src" }
+requires-python = ">=3.9,<4.0"
+license = { text = "MIT" }
+authors = [
+  { name = "Steve Storck", email = "steve973@gmail.com" }
 ]
-license = "MIT"
-
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.9"
-pyyaml = "^6.0.2"
-pytest = "^8.4.1"
-attrs = "^25.3.0"
+dependencies = [
+  "pyyaml>=6.0.2",
+  "attrs>=25.3.0",
+  'tomli>=2.2; python_version < "3.11"',  # stdlib tomllib on 3.11+
+  "tomli-w (>=1.2.0)",
+  "poetry-core (>=2.0.0)",
+]
 
-[tool.poetry.scripts]
+[project.optional-dependencies]
+write = [
+  "tomli-w>=1.2.0"
+]
+test = [
+  "pytest>=8.4.1",
+  "tomli-w>=1.2.0"
+]
+
+# Console script entry point (PEP 621)
+[project.scripts]
 pychubby = "pychubby.package.cli:main"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+# --- Poetry-specific sections (still valid in Poetry 2.x) ---
+
+# Keep src/ layout discovery for Poetry
+[[tool.poetry.packages]]
+include = "pychubby"
+from = "src"
+
+# Dev-only dependency group (Poetry 2.x)
+# Install with: poetry install --with dev  (or set it as default in your config)
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+tomli-w = "^1.0.0"
