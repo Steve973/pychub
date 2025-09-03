@@ -441,8 +441,11 @@ chub = "dist/mybundle.chub"
 wheel = "dist/app-1.2.3.whl"
 entrypoint = "pkg.cli:main"
 add_wheels = ["dist/addon.whl"]
-includes = ["README.md::docs", "config/extra.cfg::conf"]
-
+includes = [
+  "docs/README.md",                  # Copies to includes/README.md
+  "docs/README.md::manuals/",        # Copies to includes/manuals/README.md
+  "docs/README.md::manuals/guide.md" # Copies to includes/manuals/guide.md
+]
 [scripts]
 pre  = ["scripts/pre_check.sh"]
 post = ["scripts/post_install.sh"]
