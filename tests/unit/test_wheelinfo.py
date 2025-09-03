@@ -4,7 +4,6 @@ import json
 import re
 from email.parser import Parser
 from importlib import resources
-from pathlib import Path
 from typing import Any, Dict, List, Mapping
 
 import pytest

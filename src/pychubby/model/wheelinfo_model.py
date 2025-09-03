@@ -4,10 +4,12 @@ import hashlib
 import re
 import zipfile
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import field
 from email.parser import Parser
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+
+from pychubby.model.dataclass_shim import dataclass
 
 # --------------------------------------------------------------------------
 # Selectors (case-insensitive). Use "A|B" to mean "prefer A, else B".
