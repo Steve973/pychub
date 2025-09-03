@@ -84,9 +84,13 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
         str(chub_out),
     ]
 
-    chubconfig = kwargs.get("chubproject")
-    if chubconfig:
-        args += ["--chubproject", chubconfig]
+    chubproject = kwargs.get("chubproject")
+    if chubproject:
+        args += ["--chubproject", chubproject]
+
+    chubproject_save = kwargs.get("chubproject_save")
+    if chubproject_save:
+        args += ["--chubproject-save", chubproject_save]
 
     entrypoint = kwargs.get("entrypoint")
     if entrypoint:

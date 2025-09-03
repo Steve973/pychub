@@ -4,7 +4,7 @@ import sys
 from importlib.metadata import PackageNotFoundError, version as get_version
 from pathlib import Path
 
-from .chubproject import load_chubproject
+from .chubproject import load_chubproject, save_chubproject
 from .packager import build_chub
 from ..model.chubproject_model import ChubProject
 
@@ -30,6 +30,10 @@ def process_options(args):
             print("pychubby: (not installed)")
 
     build_args = ChubProject.override_from_cli_args(chubproject, vars(args)) if chubproject else ChubProject.from_cli_args(vars(args))
+
+    if args.chubproject_save:
+        chubproject_path = Path(args.chubproject_save).expanduser().resolve()
+        save_chubproject(build_args, chubproject_path, overwrite=True, make_parents=True)
 
     build_chub(build_args)
 
