@@ -4,22 +4,48 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "pychub"
-version = "0.1.0"
-description = "Make a Python-native .chub installer from a wheelhouse."
+version = "1.0.0"
+description = "Make a Python-native .chub installer from wheels and their dependencies."
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 authors = [
   { name = "Steve Storck", email = "steve973@gmail.com" }
 ]
 classifiers = [
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: Unix",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Archiving :: Packaging",
+    "Topic :: System :: Installation/Setup",
+    "Topic :: System :: Software Distribution",
+    "Topic :: Utilities"
 ]
+
+keywords = [
+    "bundle",
+    "chub",
+    "executable",
+    "package",
+    "packaging",
+    "zipapp"
+]
+
+[project.urls]
+Homepage = "https://github.com/Steve973/pychub"
+Source = "https://github.com/Steve973/pychub/tree/main"
 
 dependencies = [
   "pyyaml>=6.0.2",
