@@ -118,28 +118,22 @@ jobs:
       - name: Build distribution
         run: python -m build
 
-      # --- GitHub Packages (works with built-in GITHUB_TOKEN) ---
       - name: Publish to GitHub Packages
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.GITHUB_TOKEN }}
-          repository-url: https://upload.pypi.org/legacy/  # <-- will override below
-        env:
-          # For GitHub Packages, override repository URL
-          # Replace OWNER with your GitHub username or org
-          TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          repository-url: https://pypi.pkg.github.com/Steve973
 
-      # --- PyPI.org (placeholder, won’t run until you uncomment and set secret) ---
+      # --- PyPI.org (disabled for now) ---
       # - name: Publish to PyPI.org
       #   if: startsWith(github.ref, 'refs/tags/')
       #   uses: pypa/gh-action-pypi-publish@release/v1
       #   with:
       #     user: __token__
       #     password: ${{ secrets.PYPI_TOKEN }}
+      #     repository-url: https://upload.pypi.org/legacy/
 
       # --- GitHub Release (only on tags) ---
       - name: Create GitHub Release and upload wheel
