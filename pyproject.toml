@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9,<4.0"
 license = { file = "LICENSE" }
 authors = [
-  { name = "Steve Storck", email = "steve973@gmail.com" }
+    { name = "Steve Storck", email = "steve973@gmail.com" }
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -33,7 +33,6 @@ classifiers = [
     "Topic :: System :: Software Distribution",
     "Topic :: Utilities"
 ]
-
 keywords = [
     "bundle",
     "chub",
@@ -42,27 +41,26 @@ keywords = [
     "packaging",
     "zipapp"
 ]
-
-[project.urls]
-Homepage = "https://github.com/Steve973/pychub"
-Source = "https://github.com/Steve973/pychub/tree/main"
-
 dependencies = [
-  "pyyaml>=6.0.2",
-  "attrs>=25.3.0",
-  'tomli>=2.2; python_version < "3.11"',  # stdlib tomllib on 3.11+
-  "tomli-w (>=1.2.0)",
-  "poetry-core (>=2.1.0)",
+    "pyyaml>=6.0.2",
+    "attrs>=25.3.0",
+    'tomli>=2.2; python_version < "3.11"',
+    "tomli-w>=1.2.0",
+    "poetry-core>=2.1.0",
 ]
 
 [project.optional-dependencies]
 write = [
-  "tomli-w>=1.2.0"
+    "tomli-w>=1.2.0"
 ]
 test = [
-  "pytest>=8.4.1",
-  "tomli-w>=1.2.0"
+    "pytest>=8.4.1",
+    "tomli-w>=1.2.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/Steve973/pychub"
+Source = "https://github.com/Steve973/pychub/tree/main"
 
 # Console script entry point (PEP 621)
 [project.scripts]
@@ -79,8 +77,3 @@ from = "src"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 tomli-w = "^1.0.0"
-
-[[tool.poetry.source]]
-name = "local-pypi"
-url = "http://192.168.0.3:8080/repository/kdp-pypi/"
-priority = "explicit"
