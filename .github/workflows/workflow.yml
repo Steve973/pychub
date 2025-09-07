@@ -1,4 +1,8 @@
-name: Build and Check
+name: Build, Check, and Release
+
+permissions:
+  contents: write
+  packages: write
 
 on:
   push:
@@ -93,3 +97,53 @@ jobs:
         run: |
           pip install -U twine
           twine check dist/*
+
+  release:
+    needs: [check]
+    runs-on: ubuntu-latest
+    if: |
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build distribution
+        run: python -m build
+
+      # --- GitHub Packages (works with built-in GITHUB_TOKEN) ---
+      - name: Publish to GitHub Packages
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.GITHUB_TOKEN }}
+          repository-url: https://upload.pypi.org/legacy/  # <-- will override below
+        env:
+          # For GitHub Packages, override repository URL
+          # Replace OWNER with your GitHub username or org
+          TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- PyPI.org (placeholder, won’t run until you uncomment and set secret) ---
+      # - name: Publish to PyPI.org
+      #   if: startsWith(github.ref, 'refs/tags/')
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   with:
+      #     user: __token__
+      #     password: ${{ secrets.PYPI_TOKEN }}
+
+      # --- GitHub Release (only on tags) ---
+      - name: Create GitHub Release and upload wheel
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
