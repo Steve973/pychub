@@ -107,7 +107,7 @@ jobs:
     if: |
       github.ref == 'refs/heads/main' ||
       startsWith(github.ref, 'refs/tags/')
-    environment: pypi
+    environment: pychub
     steps:
       - uses: actions/checkout@v4
 
@@ -122,12 +122,20 @@ jobs:
       - name: Build distribution
         run: python -m build
 
+      - name: Publish to TestPyPI
+        if: github.ref == 'refs/heads/main'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.TESTPYPI_ACCOUNT_TOKEN }}
+          repository-url: https://test.pypi.org/legacy/
+
       - name: Publish to PyPI.org
         if: startsWith(github.ref, 'refs/tags/')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
-          password: ${{ secrets.pypi_account_token }}
+          password: ${{ secrets.PYCHUB_PYPI_TOKEN }}
           repository-url: https://upload.pypi.org/legacy/
 
       # --- GitHub Release (only on tags) ---
