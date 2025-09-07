@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from pychubby.model.chubproject_model import ChubProject
+from pychub.model.chubproject_model import ChubProject
 
 # --- reader: tomllib on 3.11+, tomli on 3.9–3.10 ---
 try:
@@ -31,7 +31,7 @@ def load_chubproject(path: str | Path) -> ChubProject:
 
     - PATH is the filesystem path to the TOML file (e.g., passed via --chubproject PATH).
     - Supports flexible namespacing inside the file via ChubProject.from_toml_document:
-        [package], [pychubby.package], or any table ending with ".pychubby.package".
+        [package], [pychub.package], or any table ending with ".pychub.package".
     - After parsing, records the file's absolute path under metadata["__file__"].
     """
     p = Path(path).expanduser().resolve()

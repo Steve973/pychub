@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
-from pychubby.model.chubconfig_model import dataclass
-from pychubby.model.includes_model import IncludeSpec
-from pychubby.model.scripts_model import Scripts
+from pychub.model.chubconfig_model import dataclass
+from pychub.model.includes_model import IncludeSpec
+from pychub.model.scripts_model import Scripts
 
 
 @dataclass(slots=True)
@@ -47,8 +47,8 @@ class ChubProject:
         """
         Load with flexible namespacing:
           1) [package]
-          2) [pychubby.package]
-          3) any table whose dotted path endswith ".pychubby.package"
+          2) [pychub.package]
+          3) any table whose dotted path endswith ".pychub.package"
           4) if exactly one table looks package-like, use it; otherwise error
         """
         tbl = ChubProject._select_package_table(doc)
@@ -203,12 +203,12 @@ class ChubProject:
         if isinstance(pkg, Mapping):
             return pkg
 
-        # 2) scan for pychubby.package or any *.pychubby.package
+        # 2) scan for pychub.package or any *.pychub.package
         candidates: List[Tuple[int, str, Mapping[str, Any]]] = []
         for path, tbl in ChubProject._walk_tables("", doc):
-            if path == "pychubby.package":
+            if path == "pychub.package":
                 candidates.append((0, path, tbl))
-            elif path.endswith(".pychubby.package"):
+            elif path.endswith(".pychub.package"):
                 candidates.append((1, path, tbl))
 
         if candidates:
@@ -226,8 +226,8 @@ class ChubProject:
             return lookalikes[0][1]
         if not lookalikes:
             raise ValueError(
-                "No package-like table found. Provide [package], [pychubby.package], "
-                "a table ending with .pychubby.package, or use a flattened config."
+                "No package-like table found. Provide [package], [pychub.package], "
+                "a table ending with .pychub.package, or use a flattened config."
             )
         paths = ", ".join(p for p, _ in lookalikes)
         raise ValueError(f"Multiple package-like tables found: {paths}. Choose and use only one.")

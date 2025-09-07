@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from pychubby.model.chubconfig_model import ChubConfig
-from pychubby.runtime.constants import CHUBCONFIG_FILENAME
+from pychub.model.chubconfig_model import ChubConfig
+from pychub.runtime.constants import CHUBCONFIG_FILENAME
 
 
 def load_chubconfig(bundle_root: Path) -> ChubConfig | None:

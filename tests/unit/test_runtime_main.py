@@ -4,8 +4,8 @@ from types import SimpleNamespace
 from pathlib import Path
 import pytest
 
-from pychubby.runtime.actions import runtime_main
-from pychubby.runtime.constants import CHUB_LIBS_DIR
+from pychub.runtime.actions import runtime_main
+from pychub.runtime.constants import CHUB_LIBS_DIR
 
 
 # --- Helpers / fixtures ---
@@ -58,7 +58,7 @@ def fake_bundle(tmp_path, monkeypatch, config_obj):
 
 def test_main_prints_version(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--version"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--version"])
 
     called = {}
     monkeypatch.setattr(runtime_main, "show_version", lambda d: called.setdefault("version", d))
@@ -69,7 +69,7 @@ def test_main_prints_version(monkeypatch, fake_bundle):
 
 def test_main_lists_wheels(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--list"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--list"])
 
     called = {}
     monkeypatch.setattr(runtime_main, "list_wheels", lambda d, **kw: called.setdefault("list", (d, kw)))
@@ -85,7 +85,7 @@ def test_main_lists_wheels(monkeypatch, fake_bundle):
 
 def test_main_unpacks(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--unpack", "/tmp/foo"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--unpack", "/tmp/foo"])
 
     unpacked = {}
     monkeypatch.setattr(runtime_main, "unpack_chub", lambda bundle, dest: unpacked.setdefault("args", (bundle, dest)))
@@ -98,7 +98,7 @@ def test_main_unpacks(monkeypatch, fake_bundle):
 
 def test_main_errors_when_no_wheels(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby"])
+    monkeypatch.setattr(sys, "argv", ["pychub"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [])
     monkeypatch.setattr(runtime_main, "die", lambda msg: (_ for _ in ()).throw(SystemExit(msg)))
 
@@ -111,7 +111,7 @@ def test_main_errors_when_no_wheels(monkeypatch, fake_bundle):
 
 def test_main_exec_skips_scripts_and_runs_entrypoint(monkeypatch, fake_bundle, config_obj):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--exec"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--exec"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
 
     # ensure scripts are NOT called
@@ -156,7 +156,7 @@ def test_main_exec_skips_scripts_and_runs_entrypoint(monkeypatch, fake_bundle, c
 
 def test_main_exec_forwards_passthru_after_dashdash(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--exec", "--", "--alpha", "1"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--exec", "--", "--alpha", "1"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
     monkeypatch.setattr(runtime_main, "create_venv", lambda *a, **k: None)
     monkeypatch.setattr(runtime_main, "_venv_python", lambda p: Path("/vpy"))
@@ -177,7 +177,7 @@ def test_main_exec_forwards_passthru_after_dashdash(monkeypatch, fake_bundle):
 
 def test_main_handles_venv_with_pre_and_post(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--venv", "/my/venv"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--venv", "/my/venv"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
     monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda *a: 0)
 
@@ -196,7 +196,7 @@ def test_main_handles_venv_with_pre_and_post(monkeypatch, fake_bundle):
 
 def test_main_venv_no_pre_scripts_skips_install_but_may_run_post(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--venv", "/venv", "--no-pre-scripts"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--venv", "/venv", "--no-pre-scripts"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
     monkeypatch.setattr(runtime_main, "_run_entrypoint_with_python", lambda *a: 0)
 
@@ -217,7 +217,7 @@ def test_main_venv_no_pre_scripts_skips_install_but_may_run_post(monkeypatch, fa
 
 def test_main_normal_install_runs_pre_and_post(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby"])
+    monkeypatch.setattr(sys, "argv", ["pychub"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
 
     flow = {"pre": 0, "post": 0, "install": 0}
@@ -231,7 +231,7 @@ def test_main_normal_install_runs_pre_and_post(monkeypatch, fake_bundle):
 
 def test_main_run_baked_entrypoint_when_run_flag_no_arg(monkeypatch, fake_bundle, config_obj):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--run"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--run"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
 
     # bypass pre/post/install quickly
@@ -255,7 +255,7 @@ def test_main_run_baked_entrypoint_when_run_flag_no_arg(monkeypatch, fake_bundle
 
 def test_main_run_exit_nonzero_exits(monkeypatch, fake_bundle):
     root, libs = fake_bundle
-    monkeypatch.setattr(sys, "argv", ["pychubby", "--run", "demo:main"])
+    monkeypatch.setattr(sys, "argv", ["pychub", "--run", "demo:main"])
     monkeypatch.setattr(runtime_main, "discover_wheels", lambda d, only=None: [libs / "a.whl"])
 
     # silence install & scripts

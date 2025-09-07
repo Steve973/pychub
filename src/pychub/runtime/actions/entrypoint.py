@@ -21,7 +21,7 @@ def _run_entrypoint_with_python(
         return 0
     if entrypoint is None:
         # Per README: warn and exit 0 when there's nothing to run
-        sys.stderr.write("pychubby: no entrypoint to run; installation complete.\n")
+        sys.stderr.write("pychub: no entrypoint to run; installation complete.\n")
         return 0
 
     if ":" in entrypoint:

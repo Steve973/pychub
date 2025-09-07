@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from pychubby.runtime.actions import list as list_action
+from pychub.runtime.actions import list as list_action
 
 
 # --- Fallback (no config / libs scanning) ---

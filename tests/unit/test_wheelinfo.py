@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Mapping
 
 import pytest
 
-from pychubby.model.wheelinfo_model import WheelInfo, ExtrasInfo
+from pychub.model.wheelinfo_model import WheelInfo, ExtrasInfo
 
 
 # ---------- helpers (test-local) ----------

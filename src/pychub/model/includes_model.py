@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional
 
-from pychubby.model.chubconfig_model import dataclass
+from pychub.model.chubconfig_model import dataclass
 
 
 @dataclass(slots=True)

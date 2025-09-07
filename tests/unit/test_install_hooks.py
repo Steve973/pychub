@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 
-from pychubby.runtime.actions import install_hooks
+from pychub.runtime.actions import install_hooks
 
 
 # Helpers to force predictable directories inside the temp bundle

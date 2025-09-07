@@ -8,10 +8,10 @@ def show_version(libs_dir) -> None:
     print(f"Python: {sys.version.split()[0]}")
 
     try:
-        version = im.version("pychubby")
-        print(f"pychubby: {version}")
+        version = im.version("pychub")
+        print(f"pychub: {version}")
     except im.PackageNotFoundError:
-        print("pychubby: (not installed)")
+        print("pychub: (not installed)")
 
     wheels = discover_wheels(libs_dir)
     print("Bundled wheels:")

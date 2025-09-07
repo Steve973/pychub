@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from pychubby.runtime.actions import install
+from pychub.runtime.actions import install
 
 
 # --- Dry-run behavior ---

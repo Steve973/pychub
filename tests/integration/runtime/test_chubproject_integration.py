@@ -1,4 +1,4 @@
-from pychubby.package.chubproject import load_chubproject
+from pychub.package.chubproject import load_chubproject
 from tests.integration._asserts import assert_rc_ok
 from tests.integration.conftest import run_build_cli
 

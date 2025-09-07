@@ -2,7 +2,7 @@ import json
 from email.parser import Parser
 from pathlib import Path
 
-from pychubby.model.wheelinfo_model import WheelInfo, ExtrasInfo  # adjust import paths
+from pychub.model.wheelinfo_model import WheelInfo, ExtrasInfo  # adjust import paths
 
 
 def parse_metadata_text_to_dict(text: str) -> dict:

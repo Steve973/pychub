@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 import pytest
 
-from pychubby.runtime.actions import version
+from pychub.runtime.actions import version
 
 
 @pytest.fixture
@@ -29,10 +29,10 @@ def test_show_version_with_installed_package(monkeypatch, capsys, fake_wheel, tm
 
     out = capsys.readouterr().out
     assert f"Python: {sys.version.split()[0]}" in out
-    assert "pychubby: 1.2.3" in out
+    assert "pychub: 1.2.3" in out
     assert "Bundled wheels:" in out
     assert "  - foo.whl" in out and "  - bar.whl" in out
-    assert called["pkg"] == "pychubby"  # ensure correct dist is queried
+    assert called["pkg"] == "pychub"  # ensure correct dist is queried
 
 
 def test_show_version_when_pychubby_not_installed(monkeypatch, capsys, tmp_path):
@@ -45,7 +45,7 @@ def test_show_version_when_pychubby_not_installed(monkeypatch, capsys, tmp_path)
     version.show_version(tmp_path)
 
     out = capsys.readouterr().out
-    assert "pychubby: (not installed)" in out
+    assert "pychub: (not installed)" in out
     assert "Bundled wheels:" in out
     assert "  (none)" in out
 
@@ -57,7 +57,7 @@ def test_show_version_with_none_from_discover(monkeypatch, capsys, tmp_path):
     version.show_version(tmp_path)
 
     out = capsys.readouterr().out
-    assert "pychubby: 9.9.9" in out
+    assert "pychub: 9.9.9" in out
     assert "Bundled wheels:" in out
     assert "  (none)" in out
 

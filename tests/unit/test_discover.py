@@ -1,4 +1,4 @@
-from pychubby.runtime.actions import discover
+from pychub.runtime.actions import discover
 
 
 def test_discover_wheels_empty_dir(tmp_path):

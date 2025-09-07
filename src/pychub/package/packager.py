@@ -107,8 +107,8 @@ def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
 
 def copy_runtime_files(chub_build_dir: Path) -> None:
     candidates = [
-        Path(__file__).resolve().parent.parent / RUNTIME_DIR,  # src/pychubby/runtime
-        Path(__file__).resolve().parent / RUNTIME_DIR,         # src/pychubby/package/runtime (legacy)
+        Path(__file__).resolve().parent.parent / RUNTIME_DIR,  # src/pychub/runtime
+        Path(__file__).resolve().parent / RUNTIME_DIR,         # src/pychub/package/runtime (legacy)
     ]
     runtime_src = next((p for p in candidates if p.exists()), None)
     if runtime_src is None:

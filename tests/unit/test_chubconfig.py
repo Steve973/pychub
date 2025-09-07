@@ -1,8 +1,8 @@
 import yaml
 
-from pychubby.model.chubconfig_model import ChubConfig
-from pychubby.runtime.actions import chubconfig
-from pychubby.runtime.constants import CHUBCONFIG_FILENAME
+from pychub.model.chubconfig_model import ChubConfig
+from pychub.runtime.actions import chubconfig
+from pychub.runtime.constants import CHUBCONFIG_FILENAME
 
 
 def test_load_chubconfig_returns_none_if_missing(tmp_path):

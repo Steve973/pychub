@@ -3,7 +3,7 @@ requires = ["poetry-core>=2.1.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "pychubby"
+name = "pychub"
 version = "0.1.0"
 description = "Make a Python-native .chub installer from a wheelhouse."
 readme = "README.md"
@@ -26,7 +26,7 @@ dependencies = [
   "attrs>=25.3.0",
   'tomli>=2.2; python_version < "3.11"',  # stdlib tomllib on 3.11+
   "tomli-w (>=1.2.0)",
-  "poetry-core (>=2.0.0)",
+  "poetry-core (>=2.1.0)",
 ]
 
 [project.optional-dependencies]
@@ -40,17 +40,21 @@ test = [
 
 # Console script entry point (PEP 621)
 [project.scripts]
-pychubby = "pychubby.package.cli:main"
+pychub = "pychub.package.cli:main"
 
 # --- Poetry-specific sections (still valid in Poetry 2.x) ---
 
 # Keep src/ layout discovery for Poetry
 [[tool.poetry.packages]]
-include = "pychubby"
+include = "pychub"
 from = "src"
 
 # Dev-only dependency group (Poetry 2.x)
-# Install with: poetry install --with dev  (or set it as default in your config)
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 tomli-w = "^1.0.0"
+
+[[tool.poetry.source]]
+name = "local-pypi"
+url = "http://192.168.0.3:8080/repository/kdp-pypi/"
+priority = "explicit"

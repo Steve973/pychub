@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from pychubby.runtime.actions import entrypoint
+from pychub.runtime.actions import entrypoint
 
 
 def test_none_entrypoint_returns_zero_and_writes_message(tmp_path, capsys):
@@ -11,7 +11,7 @@ def test_none_entrypoint_returns_zero_and_writes_message(tmp_path, capsys):
     rc = entrypoint._run_entrypoint_with_python(python, False, None, ["--flag"])  # stderr message is user-facing
     captured = capsys.readouterr()
     assert rc == 0
-    assert "pychubby: no entrypoint to run; installation complete." in captured.err
+    assert "pychub: no entrypoint to run; installation complete." in captured.err
 
 
 def test_module_function_invokes_spawnv_with_python_dash_c(monkeypatch, tmp_path):

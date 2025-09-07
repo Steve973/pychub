@@ -1,10 +1,10 @@
-# pychubby
+# pychub
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [The Name](#the-name)
-- [Why pychubby?](#why-pychubby)
+- [Why pychub?](#why-pychub)
 - [Why not just use insert favorite tool name here?](#why-not-just-use-insert-favorite-tool-name-here)
   - [Feature Comparison](#feature-comparison)
   - [Use Case Alignment](#use-case-alignment)
@@ -18,7 +18,7 @@
 
 ## Overview
 
-**pychubby** is a Python packaging tool that bundles your wheel and all of its
+**pychub** is a Python packaging tool that bundles your wheel and all of its
 dependencies into a single self-extracting `.chub` file.
 
 The `.chub` file can be executed directly with any compatible Python interpreter
@@ -32,18 +32,18 @@ be done via an **ephemeral** venv.
 
 ## The Name
 
-As you might guess, **pychubby** is a combination of **py**thon and **chubby**.
+As you might guess, **pychub** is a combination of **py**thon and **chubby**.
 While the standard wheels are quite a bit leaner, consisting of your application
-and the metadata required to install it, **pychubby** bundles all of your
+and the metadata required to install it, **pychub** bundles all of your
 dependencies into a single file. This results in a "thicker" file and, thus, the
-**pychubby** name was born.
+**pychub** name was born.
 
 Sometimes software developers like to have a little fun with naming, since
 deadlines and testing and debugging are often fairly serious matters.
 
 ---
 
-## Why pychubby?
+## Why pychub?
 
 Most Python packaging tools fall into one of two extremes:
 
@@ -52,14 +52,14 @@ Most Python packaging tools fall into one of two extremes:
 - **Wheel distribution only** - require manual `pip install` commands, assume
   users know how to manage dependencies.
 
-**pychubby** lives in between: it **avoids runtime bloat** by using the host
+**pychub** lives in between: it **avoids runtime bloat** by using the host
 Python interpreter, but also **keeps the experience smooth** by shipping all
 dependencies pre-downloaded and ready to install.
 
 This makes it:
 
 - **Build-tool agnostic** - Poetry, setuptools, Hatch, Flit, pygradle... if it
-  spits out a wheel, pychubby can package it.
+  spits out a wheel, pychub can package it.
 - **Environment agnostic** - works in any Python environment that meets your
   `Requires-Python` spec.
 - **Simple** - `python yourpackage.chub` installs everything; optionally runs
@@ -76,16 +76,16 @@ decision.
 
 There are several really great packaging tools available for python. Many of
 them share a few overlapping capabilities, and they all have their own unique
-features that help with the use cases that they were designed to solve. Pychubby
+features that help with the use cases that they were designed to solve. Pychub
 is no exception. It shares some features with other tools, but it was designed
 with a slightly different perspective to address particular use cases.
 
 Here is a table that might help users decide which tool is the best fit for
-their use case. (Hint: it might, or might not, be pychubby!)
+their use case. (Hint: it might, or might not, be pychub!)
 
 ### Feature Comparison
 
-| Feature/Need                | pychubby                       | pex                                                          | shiv                              | zipapp                         | PyInstaller / PyOxidizer |
+| Feature/Need                | pychub                       | pex                                                          | shiv                              | zipapp                         | PyInstaller / PyOxidizer |
 |-----------------------------|--------------------------------|--------------------------------------------------------------|-----------------------------------|--------------------------------|--------------------------|
 | Single-file distribution    | Yes (`.chub`)                  | Yes (`.pex`, or native executables with `--scie`)            | Yes (`.pyz`)                      | Yes (`.pyz`)                   | Yes (binary)             |
 | Includes Python interpreter | No - uses current environment  | Optional - `--scie` mode bundles an interpreter              | No - uses host interpreter        | No - uses host interpreter     | Yes - frozen binary      |
@@ -105,7 +105,7 @@ reflects how well a given tool supports that scenario, whether it’s a perfect
 match, a partial fit, or better suited elsewhere.
 
 ### Use Case Alignment
-| Use Case / Scenario                          | pychubby | pex                                | shiv                             | zipapp    | PyInstaller / PyOxidizer |
+| Use Case / Scenario                          | pychub | pex                                | shiv                             | zipapp    | PyInstaller / PyOxidizer |
 |----------------------------------------------|----------|------------------------------------|----------------------------------|-----------|--------------------------|
 | Distribute a CLI/lib in one file             | best fit | best fit                           | works                            | works     | overkill                 |
 | Ship sealed GUI/CLI to users w/o Python      | n/a      | works (esp. with `--scie`)         | n/a                              | n/a       | best fit                 |
@@ -124,16 +124,16 @@ match, a partial fit, or better suited elsewhere.
 
 ##### Notes:
 ¹ Zipapps can embed dependencies, but behavior varies depending on how you construct the archive.  
-² pychubby is only cross-platform if bundled wheels themselves are portable.  
-³ Only pychubby supports runtime post-install user scripts.  
+² pychub is only cross-platform if bundled wheels themselves are portable.  
+³ Only pychub supports runtime post-install user scripts.  
 ⁴ PyOxidizer allows scripted setup at build time, not runtime.  
-⁵ Conda support is exploratory/on the roadmap for pychubby. 
-⁶ Multi-stage Docker: install with pychubby in a builder stage (e.g., in a venv) and copy only
+⁵ Conda support is exploratory/on the roadmap for pychub. 
+⁶ Multi-stage Docker: install with pychub in a builder stage (e.g., in a venv) and copy only
   the venv/app into the runtime image; the final image contains no `pip` and performs no install.
 ⁷ Running a `.chub` with `--exec` uses an ephemeral venv and requires `pip`.
 
 So the point isn’t that any of these are "best" or "wrong" tools. They’re all
-excellent for the jobs they were built for. Pychubby simply covers a different
+excellent for the jobs they were built for. Pychub simply covers a different
 slice of the space: *inherently reproducible, single-file, wheel-based bundles
 that install into the current Python environment without pulling from the
 network*.
@@ -148,11 +148,11 @@ When the `.chub` file is created, its name is derived from the main wheel, if
 the user does not provide a name with the `--chub` option. The name is derived
 from the wheel metadata, and it is formatted as `<Name>-<Version>.chub`.
 
-While it has been mentioned that `pychubby` creates reproducible installs, it
+While it has been mentioned that `pychub` creates reproducible installs, it
 should be understood that this is not making claims about the target host state.
 This is about the bundled wheels that are installed into the target environment.
 
-When you run `pychubby`, it creates a structure like this:
+When you run `pychub`, it creates a structure like this:
 ```bash
 libs/           # your main wheel and all dependency wheels
 scripts/        # lifecycle scripts parent directory
@@ -172,7 +172,7 @@ This happens through the following steps:
 4. **Resolve and download dependencies** for each wheel using pip (also into `libs/`).
 5. **Copy any additional user-specified files** to `includes/` (with relative paths).
 6. **Copy any pre- and post-install scripts** to `scripts/pre/` and `scripts/post/`.
-7. **Inject the pychubby runtime** and include `__main__.py` to enable the runtime CLI
+7. **Inject the pychub runtime** and include `__main__.py` to enable the runtime CLI
    and its operations.
 8. **Update the `.chubconfig`** with these details, including a metadata entry for
    the `main_wheel`.
@@ -187,15 +187,15 @@ This happens through the following steps:
 
 ## CLI Parameters
 
-This section describes the CLI commands available in `pychubby` for building,
+This section describes the CLI commands available in `pychub` for building,
 and then operating, a `.chub` file.
 
 ### Building a Chub
 
-The `pychubby` build CLI packages your Python project’s wheel and its  
+The `pychub` build CLI packages your Python project’s wheel and its  
 dependencies into a single `.chub` file.
 
-    usage: pychubby <wheel> [build options]
+    usage: pychub <wheel> [build options]
 
 | Option               | Short Form | Description                                                | Repeatable |
 |----------------------|------------|------------------------------------------------------------|------------|
@@ -238,7 +238,7 @@ Notes:
   - Optional.
   - The value is a single string, and quoted if it contains spaces.
   - May be overridden during runtime invocation.
-  - Pychubby does not parse or validate the inner arguments; they are stored
+  - Pychub does not parse or validate the inner arguments; they are stored
     and passed verbatim to the child process when `--run` or `--exec` is used
     at runtime.
   - Formats:
@@ -297,59 +297,59 @@ Notes:
 
 #### Example Usage (build)
 
-The usage of `pychubby` should be fairly straightforward and intuitive, as you
+The usage of `pychub` should be fairly straightforward and intuitive, as you
 can see in the following examples:
 
 1. Basic build
    ```bash
-   pychubby dist/mypackage-1.0.0-py3-none-any.whl
+   pychub dist/mypackage-1.0.0-py3-none-any.whl
    ```
 
 2. Custom output file
    ```bash
-   pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+   pychub dist/mypackage-1.0.0-py3-none-any.whl \
         --chub dist/app.chub
    ```
 
 3. Simple callable spec (no args, and no spaces, so no quotes necessary)
    ```bash
-   pychubby dist/app.whl \
+   pychub dist/app.whl \
          --entrypoint mypkg.cli:main
    ```
 
 4. Callable spec with arguments (quotes are required because of spaces)
    ```bash
-    pychubby dist/app.whl \
+    pychub dist/app.whl \
          --entrypoint "mypkg.cli:main --mode train --limit 100"
    ```
 
 5. Console script with arguments (quotes are required because of spaces)
    ```bash
-    pychubby dist/app.whl \
+    pychub dist/app.whl \
          --entrypoint "mypackage-cli --verbose --config conf.yml"
    ```
 
 6. Include a single file
    ```bash
-   pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+   pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --include ./extra.cfg
    ```
 
 7. Include with destination path relative to install dir
    ```bash
-   pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+   pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --include README.md::docs
    ```
 
 8. Multiple includes (comma-separated in a single flag)
    ```bash
-   pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+   pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --include a.txt::conf,b.json::data,c.ini
    ```
 
 9. Multiple includes (repeat the flag)
    ```bash
-   pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+   pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --include a.txt \
          --include b.json::data \
          --include c.ini
@@ -357,19 +357,19 @@ can see in the following examples:
 
 10. Add pre-install scripts
     ```bash
-    pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+    pychub dist/mypackage-1.0.0-py3-none-any.whl \
           --pre-script ./scripts/check_env.sh
     ```
 
 11. Add post-install scripts (multiple via comma-separated list)
     ```bash
-    pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+    pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --post-script init.sh,finish.sh
     ```
 
 12. Combine pre/post scripts with includes and entrypoint
     ```bash
-    pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+    pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --pre-script pre.sh \
          --post-script post.sh \
          --include config.toml::conf \
@@ -378,44 +378,44 @@ can see in the following examples:
 
 13. Add metadata entries (single)
     ```bash
-    pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+    pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --metadata-entry maintainer:me@example.com
     ```
 
 14. Add metadata entries (list value and multiple pairs in one flag)
     ```bash
-    pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+    pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --metadata-entry tags:http,client,cli,priority \
          --metadata-entry team:platform
     ```
 
 15. Verbose build
     ```bash
-    pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+    pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --verbose
     ```
 
 16. Append an additional wheel to an existing .chub (repeatable flag)
     ```bash
-    pychubby --chub dist/app.chub \
+    pychub --chub dist/app.chub \
          --add-wheel dist/extras/tool-2.0.0-py3-none-any.whl \
          --add-wheel dist/extras/helper-1.2.3-py3-none-any.whl
     ```
 
 17. Append additional wheels via a single comma-separated flag
     ```bash
-    pychubby --chub dist/app.chub \
+    pychub --chub dist/app.chub \
          --add-wheel dist/extras/tool-2.0.0-py3-none-any.whl,dist/extras/helper-1.2.3-py3-none-any.whl
     ```
 
 18. Show version and exit
     ```bash
-    pychubby --version
+    pychub --version
     ```
 
 19. “Everything together” example
     ```bash
-    pychubby dist/mypackage-1.0.0-py3-none-any.whl \
+    pychub dist/mypackage-1.0.0-py3-none-any.whl \
          --chub dist/multi.chub \
          --entrypoint mypackage.cli:main \
          --include config.toml::conf,README.md::docs \
@@ -472,13 +472,13 @@ example would be written as:
   metadata = {maintainer = "you@example.com", tags = ["http", "client"]}
   ```
 - The `package` namespace is optional. Not only is it optional, but namespaces
-like `tool.pychubby.package` are also permissible. If you do include a namespace
-it must be `package`, `pychubby.package`, or it must end with
-`.pychubby.package` (e.g., `tool.pychubby.package`).
+like `tool.pychub.package` are also permissible. If you do include a namespace
+it must be `package`, `pychub.package`, or it must end with
+`.pychub.package` (e.g., `tool.pychub.package`).
 - Using a `chubproject.toml` file implies that the `.chub` build is one-shot.
 While you *can* append additional wheels to an existing `.chub` file, the file
 entries can only include items at initial build time. If you specify an existing
-`.chub` file in the `chubproject.toml` file, pychubby will exit with an error.
+`.chub` file in the `chubproject.toml` file, pychub will exit with an error.
 
 ### Operating a Chub
 
@@ -489,7 +489,7 @@ Python environment (system Python, venv, conda env, etc.).
     usage: python /path/to/some.chub [runtime options] [-- [entrypoint-args...]]
 
 The `--` token is the POSIX end‑of‑options marker. Everything after `--` is
-*not* parsed by pychubby and is forwarded unchanged to the entrypoint process
+*not* parsed by pychub and is forwarded unchanged to the entrypoint process
 selected by `--run` (or the baked‑in entrypoint if none is provided).
 
 | Option               | Short Form | Description                                        |
@@ -555,7 +555,7 @@ Notes:
     - `module:function`
     - `console-script-name`
   - To pass arguments to the entrypoint, place them **after** `--` so
-    pychubby does not interpret them.
+    pychub does not interpret them.
   - Virtual environment option compatibility:
     - `--exec` (for ephemeral venv)
     - `--venv` (for persistent venv)
@@ -569,7 +569,7 @@ Notes:
 - `--version`:
   - Shows version information, regardless of verbosity, (then exits) for:
     - current environment's Python interpreter
-    - pychubby
+    - pychub
     - bundled wheels
 - `--venv DIR`:
   - Creates a virtual environment at path `DIR` and installs wheels into it.
@@ -784,10 +784,10 @@ damage to your system. Either ensure that you *completely trust* the vendor
 that provided the `.chub` file, or verify the script contents before you
 execute/install the `.chub` file.
 
-When pychubby runs your pre- and post-install scripts, it does so as simply and
+When pychub runs your pre- and post-install scripts, it does so as simply and
 predictably as possible. Pre-install scripts run first, in the order you list
 them. Post-install scripts run afterward, also in order. If any script fails
-(returns a non‑zero exit code), pychubby immediately stops and reports which
+(returns a non‑zero exit code), pychub immediately stops and reports which
 script has failed. Missing scripts won’t blow up the run. They’re skipped with
 a warning so that you don’t get stuck on a typo.
 
@@ -800,7 +800,7 @@ or WSL2) on your `PATH`. If you want a pain-free cross‑platform story, prefer
 `.cmd`/`.bat`/`.ps1` on Windows and shell/Python scripts on POSIX, or just write
 Python scripts and run them with `python`.
 
-Please be aware that `pychubby` behavior on Windows is untested. The recommended
+Please be aware that `pychub` behavior on Windows is untested. The recommended
 approach for Windows users, at this time, is to use WSL2, or another POSIX-like
 shell. If native Windows support is important to you, please file an issue, and
 reach out to collaborate, if possible.

@@ -6,9 +6,9 @@ import zipfile
 import pytest
 import yaml
 
-from pychubby.model.chubproject_model import ChubProject
-from pychubby.package import packager
-from pychubby.package.constants import (
+from pychub.model.chubproject_model import ChubProject
+from pychub.package import packager
+from pychub.package.constants import (
     CHUB_BUILD_DIR,
     CHUB_LIBS_DIR,
     CHUB_SCRIPTS_DIR,

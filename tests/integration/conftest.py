@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from pychubby.package.constants import CHUB_BUILD_DIR
+from pychub.package.constants import CHUB_BUILD_DIR
 
 
 @pytest.fixture(scope="session")
 def test_env():
-    """Shared test environment: temp dir, venv, built wheel, pychubby install."""
+    """Shared test environment: temp dir, venv, built wheel, pychub install."""
     root_dir = Path(__file__).resolve().parent.parent.parent
     src_dir = root_dir / "src"
     test_pkg_dir = root_dir / "tests" / "test_proj"
@@ -78,7 +78,7 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     args = [
         str(test_env["python_bin"]),
         "-m",
-        "pychubby.package.cli",
+        "pychub.package.cli",
         str(wheel_path),
         "--chub",
         str(chub_out),
@@ -130,7 +130,7 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
 
 def get_chub_contents(chub_path: Path):
     """Return (names, ChubConfig instance) from the built .chub archive."""
-    from pychubby.model.chubconfig_model import ChubConfig
+    from pychub.model.chubconfig_model import ChubConfig
 
     with zipfile.ZipFile(chub_path, "r") as zf:
         names = zf.namelist()

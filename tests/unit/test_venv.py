@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from pychubby.runtime.actions import venv as venv_mod
+from pychub.runtime.actions import venv as venv_mod
 from tests.utils import CoercingPath
 
 

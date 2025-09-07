@@ -1,6 +1,6 @@
 import pytest
 
-from pychubby.runtime.actions import unpack
+from pychub.runtime.actions import unpack
 
 
 def test_unpack_chub_default_dest_and_counts(tmp_path, capsys):

@@ -6,8 +6,8 @@ from dataclasses import field
 import json
 import yaml
 
-from pychubby.model.dataclass_shim import dataclass
-from pychubby.model.scripts_model import Scripts
+from pychub.model.dataclass_shim import dataclass
+from pychub.model.scripts_model import Scripts
 
 
 @dataclass(slots=True, frozen=True)

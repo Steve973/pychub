@@ -7,7 +7,7 @@ import argparse
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="pychubby",
+        prog="pychub",
         description=(
             "Install bundled wheels into the current Python environment; "
             "optionally run a baked or specified entrypoint."

@@ -42,10 +42,3 @@ def test_metadata_entry(test_env, tmp_path):
     meta = cfg.metadata
 
     assert meta.get("author") == "steve"
-    # tags = meta.get("tags")
-    # if isinstance(tags, str):
-    #     assert {t.strip() for t in tags.split(",")} == {"foo", "bar"}
-    # elif isinstance(tags, list):
-    #     assert {t.strip() for t in tags} == {"foo", "bar"}
-    # else:
-    #     raise AssertionError(f"unexpected 'tags' type: {type(tags)}")

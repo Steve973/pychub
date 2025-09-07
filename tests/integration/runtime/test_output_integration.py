@@ -40,7 +40,7 @@ def test_version_prints_python_and_pychubby(test_env, tmp_path, flags):
     proc = run_runtime_cli(chub, [*flags, "--version"], test_env["python_bin"])
     assert_rc_ok(proc)
     # Keep expectations loose; exact version string is environment-specific
-    assert_in_stdout(proc, "python", "pychubby")
+    assert_in_stdout(proc, "python", "pychub")
 
 
 @pytest.mark.integration

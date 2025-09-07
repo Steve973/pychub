@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 import pytest
 
-from pychubby.model.includes_model import IncludeSpec
-from pychubby.package.chubproject import (
+from pychub.model.includes_model import IncludeSpec
+from pychub.package.chubproject import (
     ChubProjectError,
     load_chubproject,
     save_chubproject,
@@ -150,7 +150,7 @@ def test_save_makes_parents(tmp_path: Path):
 
 def test_save_raises_when_no_writer(monkeypatch, tmp_path: Path):
     # Force the module to believe no writer is available
-    import pychubby.package.chubproject as chp
+    import pychub.package.chubproject as chp
     monkeypatch.setattr(chp, "_TOML_WRITER", None, raising=True)
     with pytest.raises(ChubProjectError) as ei:
         save_chubproject({"build": {}}, path=tmp_path / "x.toml", overwrite=True)

@@ -9,25 +9,34 @@ from .packager import build_chub
 from ..model.chubproject_model import ChubProject
 
 
+def parse_chubproject(chubproject_path: Path) -> ChubProject | None:
+    if not chubproject_path.is_file():
+        raise FileNotFoundError(f"Chub project file not found: {chubproject_path}")
+    try:
+        return load_chubproject(chubproject_path)
+    except ImportError:
+        print("pychub: (not installed)")
+
+
+def process_chubproject(chubproject_path: Path):
+    chubproject = parse_chubproject(chubproject_path)
+    build_chub(chubproject)
+
+
 def process_options(args):
     if args.version:
         print(f"Python: {sys.version.split()[0]}")
         try:
-            version = get_version("pychubby")
+            version = get_version("pychub")
         except PackageNotFoundError:
             version = "(source)"
-        print(f"pychubby: {version}")
+        print(f"pychub: {version}")
         return
 
     chubproject = None
     if args.chubproject:
         chubproject_path = Path(args.chubproject).expanduser().resolve()
-        if not chubproject_path.is_file():
-            raise FileNotFoundError(f"Chub project file not found: {chubproject_path}")
-        try:
-            chubproject = load_chubproject(chubproject_path)
-        except ImportError:
-            print("pychubby: (not installed)")
+        chubproject = parse_chubproject(chubproject_path)
 
     build_args = ChubProject.override_from_cli_args(chubproject, vars(args)) if chubproject else ChubProject.from_cli_args(vars(args))
 

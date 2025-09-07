@@ -3,12 +3,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from pychubby.package.bt_options_processor import process_options
+from pychub.package.bt_options_processor import process_options
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="pychubby",
+        prog="pychub",
         description="Package a wheel and its dependencies into a .chub archive")
 
     parser.add_argument(

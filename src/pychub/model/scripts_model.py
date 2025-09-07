@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import field
 from typing import Any, Dict, List, Mapping
 
-from pychubby.model.chubconfig_model import dataclass
+from pychub.model.chubconfig_model import dataclass
 
 
 @dataclass(slots=True, frozen=True)

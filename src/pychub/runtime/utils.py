@@ -13,5 +13,5 @@ def pep668_blocked(stderr_text: str | None) -> bool:
 def die(msg_or_code) -> None:
     if isinstance(msg_or_code, int):
         sys.exit(msg_or_code)
-    print(f"pychubby: {msg_or_code}", file=sys.stderr)
+    print(f"pychub: {msg_or_code}", file=sys.stderr)
     sys.exit(2)
