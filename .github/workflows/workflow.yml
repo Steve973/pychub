@@ -101,13 +101,12 @@ jobs:
           pip install -U twine
           twine check dist/*
 
-  release:
+  publish-test-pypi:
     needs: [check]
     runs-on: ubuntu-latest
     if: |
-      github.ref == 'refs/heads/main' ||
-      startsWith(github.ref, 'refs/tags/')
-    environment: pychub
+      github.ref == 'refs/heads/main'
+    environment: pypi
     steps:
       - uses: actions/checkout@v4
 
@@ -129,6 +128,26 @@ jobs:
           user: __token__
           password: ${{ secrets.TESTPYPI_ACCOUNT_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
+
+  publish:
+    needs: [check]
+    runs-on: ubuntu-latest
+    if: |
+      startsWith(github.ref, 'refs/tags/')
+    environment: pychub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build distribution
+        run: python -m build
 
       - name: Publish to PyPI.org
         if: startsWith(github.ref, 'refs/tags/')
