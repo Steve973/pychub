@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+import glob
+import os
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from pychub.model.chubconfig_model import dataclass
 from pychub.model.includes_model import IncludeSpec
 from pychub.model.scripts_model import Scripts
+
+
+def resolve_wheels(mw: str | None = None, aw: list[str] | None = None) -> tuple[str | None, list[str]]:
+    if mw:
+        return mw, aw
+
+    cwd = os.getcwd()
+    files = sorted(glob.glob(os.path.join(cwd, "dist", "*.whl")))
+    main_wheel, *additional_wheels = files
+    return main_wheel, additional_wheels
 
 
 @dataclass(slots=True)
@@ -27,16 +39,15 @@ class ChubProject:
         if not m:
             return ChubProject(add_wheels=[], includes=[], metadata={}, scripts=Scripts())
 
-        # includes: accept both styles
-        includes: List["IncludeSpec"] = []
-        for item in (m.get("includes") or []):
-            includes.append(IncludeSpec.parse(item))
+        main_wheel, additional_wheels = resolve_wheels(m.get("wheel"), m.get("add_wheels") or [])
+
+        includes = [IncludeSpec.parse(item) for item in (m.get("includes") or [])]
 
         return ChubProject(
-            wheel=(str(m["wheel"]) if m.get("wheel") else None),
-            add_wheels=[str(x) for x in (m.get("add_wheels") or [])],
-            chub=(str(m["chub"]) if m.get("chub") else None),
-            entrypoint=(str(m["entrypoint"]) if m.get("entrypoint") else None),
+            wheel=main_wheel,
+            add_wheels=additional_wheels,
+            chub=str(m["chub"]) if m.get("chub") else None,
+            entrypoint=str(m["entrypoint"]) if m.get("entrypoint") else None,
             includes=includes,
             verbose=bool(m.get("verbose", False)),
             metadata=dict(m.get("metadata") or {}),

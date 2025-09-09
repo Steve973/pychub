@@ -480,6 +480,20 @@ While you *can* append additional wheels to an existing `.chub` file, the file
 entries can only include items at initial build time. If you specify an existing
 `.chub` file in the `chubproject.toml` file, pychub will exit with an error.
 
+This toml file paves the way for integration with popular build tools.
+
+### Integration With Other Build Tools: `hatch`, `pdm`, and `poetry`
+
+While it is beyond the sccope of this document to include specific details of
+how to configure `hatch`, `pdm`, and `poetry` to use `pychub`, know that it is,
+indeed, possible. There are three companion plugins that are available for
+`hatch`, `pdm`, and `poetry` that make it easy to integrate `pychub` with these
+tools. It is as simple as including the plugin in your `pyproject.toml` file,
+and then including the same details that you would include in a
+`chubproject.toml` file. For more information, see the
+[pychub-build-plugins](https://github.com/Steve973/pychub-build-plugins)
+repository.
+
 ### Operating a Chub
 
 When you run a `.chub` file directly with Python, it operates in  

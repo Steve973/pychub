@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "pychub"
-version = "1.0.0"
+version = "1.1.0"
 description = "Make a Python-native .chub installer from wheels and their dependencies."
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
@@ -62,18 +62,13 @@ test = [
 Homepage = "https://github.com/Steve973/pychub"
 Source = "https://github.com/Steve973/pychub/tree/main"
 
-# Console script entry point (PEP 621)
 [project.scripts]
 pychub = "pychub.package.cli:main"
 
-# --- Poetry-specific sections (still valid in Poetry 2.x) ---
-
-# Keep src/ layout discovery for Poetry
 [[tool.poetry.packages]]
 include = "pychub"
 from = "src"
 
-# Dev-only dependency group (Poetry 2.x)
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 tomli-w = "^1.0.0"
