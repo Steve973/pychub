@@ -21,14 +21,15 @@ runs:
           **/poetry.lock
           **/requirements*.txt
 
+    - name: Install Poetry
+      shell: bash
+      run: python -m pip install -U pip poetry
+
     - name: Install deps
       shell: bash
-      run: |
-        python -m pip install -U pip poetry
-        poetry install
+      run: poetry install
 
     - name: Run pytest (optional)
       if: ${{ inputs.pytest-path != '' }}
       shell: bash
-      run: |
-        poetry run pytest "${{ inputs.pytest-path }}" -q
+      run: poetry run pytest "${{ inputs.pytest-path }}" -q
