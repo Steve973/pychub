@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
 
 import pytest
 
-from pychub.model.includes_model import IncludeSpec
 from pychub.package.chubproject import (
     ChubProjectError,
     load_chubproject,
