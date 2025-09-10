@@ -27,9 +27,9 @@ runs:
 
     - name: Install deps
       shell: bash
-      run: poetry install
+      run: python -m poetry install
 
     - name: Run pytest (optional)
       if: ${{ inputs.pytest-path != '' }}
       shell: bash
-      run: poetry run pytest "${{ inputs.pytest-path }}" -q
+      run: python -m poetry run pytest "${{ inputs.pytest-path }}" -q
