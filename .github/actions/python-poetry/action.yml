@@ -4,18 +4,10 @@ inputs:
   python:
     description: Python version (e.g. 3.11)
     required: true
-  use-poetry:
-    description: "true to use Poetry install, false to use pip"
-    required: false
-    default: "false"
   pytest-path:
     description: "Path passed to pytest (e.g. tests/unit). If empty, caller runs pytest."
     required: false
     default: ""
-  extra-install:
-    description: "Extra pip packages, space-separated (e.g. 'pytest pyyaml')"
-    required: false
-    default: "pytest"
 runs:
   using: "composite"
   steps:
