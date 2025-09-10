@@ -24,7 +24,6 @@ jobs:
       - uses: ./.github/actions/python-poetry
         with:
           python: ${{ matrix.python }}
-          use-poetry: "false"
           pytest-path: tests/unit
 
   test_integration:
@@ -39,7 +38,6 @@ jobs:
       - uses: ./.github/actions/python-poetry
         with:
           python: ${{ matrix.python }}
-          use-poetry: "false"
           pytest-path: tests/integration
 
   build:
@@ -55,17 +53,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
-          cache: pip
+          cache: poetry
           cache-dependency-path: |
             **/pyproject.toml
             **/poetry.lock
             **/requirements*.txt
 
       - name: Install build tool
-        run: pip install -U build
+        run: poetry install build
 
       - name: Build distribution
-        run: python -m build
+        run: poetry build
 
       - name: Upload dist
         uses: actions/upload-artifact@v4
@@ -84,7 +82,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
-          cache: pip
+          cache: poetry
           cache-dependency-path: |
             **/pyproject.toml
             **/poetry.lock
@@ -98,7 +96,7 @@ jobs:
 
       - name: Twine check
         run: |
-          pip install -U twine
+          poetry install twine
           twine check dist/*
 
   publish-test-pypi:
@@ -108,26 +106,18 @@ jobs:
       github.ref == 'refs/heads/main'
     environment: pychub
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install build tools
-        run: pip install build
-
-      - name: Build distribution
-        run: python -m build
-
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
       - name: Publish to TestPyPI
+        id: upload
         if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYCHUB_TESTPYPI_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+          skip-existing: true
 
   publish:
     needs: [check]
@@ -136,26 +126,17 @@ jobs:
       startsWith(github.ref, 'refs/tags/')
     environment: pychub
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install build tools
-        run: pip install build
-
-      - name: Build distribution
-        run: python -m build
-
-      - name: Publish to PyPI.org
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+      - name: Publish to PyPI
+        id: upload
         if: startsWith(github.ref, 'refs/tags/')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYCHUB_PYPI_TOKEN }}
-          repository-url: https://upload.pypi.org/legacy/
+          packages-dir: dist
+          skip-existing: true
 
       # --- GitHub Release (only on tags) ---
       - name: Create GitHub Release and upload wheel
