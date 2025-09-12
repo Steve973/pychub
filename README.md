@@ -1,5 +1,7 @@
 # pychub
 
+## Overview
+
 **pychub** is a packaging tool that bundles your Python wheel and all of its
 dependencies into a single, self-extracting `.chub` file.
 
