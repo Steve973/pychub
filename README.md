@@ -1,5 +1,9 @@
 # pychub
 
+Welcome to **pychub**! This README is a quick overview of the project. It is
+meant to give you the fastest possible overview. For more details, see the
+very comprehensive [USER_GUIDE](USER_GUIDE.md).
+
 ## Overview
 
 **pychub** is a packaging tool that bundles your Python wheel and all of its
