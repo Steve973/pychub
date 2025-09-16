@@ -142,6 +142,28 @@ network*.
 
 ---
 
+## ⚠️ Platform Compatibility and Wheel Portability
+
+A `.chub` file is only portable across environments if **all** bundled wheels are
+universal. That means:
+
+- Pure-Python wheels (`py3-none-any`)
+- Platform-independent `manylinux` wheels
+- Universal2 wheels (for macOS)
+
+If your package or its dependencies include **compiled extensions**
+(e.g., numpy, Pillow, pydantic-core), the resulting `.chub` will only work on
+the platform it was built for — and only with the matching Python version and
+ABI.
+
+In these cases, the `.chub` file is **not cross-platform**. In an upcoming
+release, pychub will warn or fail on such builds unless explicitly overridden.
+
+In practice, many popular packages include native extensions, so full
+cross-platform compatibility is rare unless your dependencies are pure Python.
+
+---
+
 ## How It Works
 
 **NOTE: The target environment must be Python 3.9+ and it must have `pip` installed.**
