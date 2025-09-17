@@ -20,6 +20,26 @@ shines in their particular target areas. Likewise, **pychub** is most useful
 when you want a bundle that you can ship to any machine, regardless of the
 environment, and install the wheels and dependencies persistently.
 
+## ⚠️ Platform Compatibility and Wheel Portability
+
+A `.chub` file is only portable across environments if **all** bundled wheels are
+universal. That means:
+
+- Pure-Python wheels (`py3-none-any`)
+- Platform-independent `manylinux` wheels
+- Universal2 wheels (for macOS)
+
+If your package or its dependencies include **compiled extensions**
+(e.g., numpy, Pillow, pydantic-core), the resulting `.chub` will only work on
+the platform it was built for — and only with the matching Python version and
+ABI.
+
+In these cases, the `.chub` file is **not cross-platform**. In an upcoming
+release, pychub will warn or fail on such builds unless explicitly overridden.
+
+In practice, many popular packages include native extensions, so full
+cross-platform compatibility is rare unless your dependencies are pure Python.
+
 ## Quickstart
 
 While **pychub** has quite a few features, you can get started with just two
