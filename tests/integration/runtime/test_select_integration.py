@@ -1,3 +1,6 @@
+import shutil
+from pathlib import Path
+
 import pytest
 import pychub.runtime.rt_options_processor as op
 
@@ -80,6 +83,13 @@ def built_chub(test_env, tmp_path_factory):
     proc, chub = run_build_cli(test_env["wheel_path"], tmp, test_env, entrypoint="test_pkg.greet:main")
     assert_rc_ok(proc)
     return chub
+
+@pytest.fixture(autouse=True)
+def cleanup_named_dirs():
+    yield
+    for d in ("vdir", "udir"):
+        if Path(d).exists():
+            shutil.rmtree(d, ignore_errors=True)
 
 
 # ------------------------------- tests -------------------------------------

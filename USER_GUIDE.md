@@ -508,7 +508,7 @@ This toml file paves the way for integration with popular build tools.
 
 ### Integration With Other Build Tools: `hatch`, `pdm`, and `poetry`
 
-While it is beyond the sccope of this document to include specific details of
+While it is beyond the scope of this document to include specific details of
 how to configure `hatch`, `pdm`, and `poetry` to use `pychub`, know that it is,
 indeed, possible. There are three companion plugins that are available for
 `hatch`, `pdm`, and `poetry` that make it easy to integrate `pychub` with these
@@ -885,15 +885,15 @@ metadata:
   maintainer: someone@example.com
 ```
 
+Please be aware that users never have to create or hand-edit this file. It is
+created and maintained by `pychub` itself.
+
 ---
 
 ## Roadmap
 
 | Status      | Feature                     | Notes                                                           |
 |-------------|-----------------------------|-----------------------------------------------------------------|
-| In Progress | Support TOML for options    | Read/Write TOML files for options.                              |
-| Planned     | Build tool support          | Support integration with `pyproject.toml`.                      |
-| Planned     | Quick-start guide           | Convenience for getting started quickly.                        |
 | Planned     | Handle dependency conflicts | Provide multiple-version/duplicate-wheel dependency strategies. |
 | Exploring   | c/native support            | Explore facilitating c/native support (maybe with conda).       |
 | Exploring   | Wheel extras support        | Explore handling extras for wheels (w/Requires-Dist).           |
