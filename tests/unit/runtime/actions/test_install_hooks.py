@@ -133,19 +133,98 @@ def test_sorts_input_list_in_place(monkeypatch, tmp_path):
     assert items == ["y.sh", "z.sh"]
 
 
-# ---- Delegation wrappers sanity ----
+# ---- Python script execution ----
 
-def test_wrappers_delegate_correct_type(monkeypatch, tmp_path):
-    passed = []
+def test_python_script_uses_sys_executable(monkeypatch, tmp_path):
+    base = tmp_path / "scripts" / "post"
+    base.mkdir(parents=True)
+    (base / "script.py").write_text("print('hello')")
 
-    def spy(root, dry_run, kind, scripts):
-        passed.append((root, kind, list(scripts)))
+    calls = {}
 
-    monkeypatch.setattr(install_hooks, "run_install_scripts", spy)
+    def fake_run(cmd, **kwargs):
+        calls["cmd"] = cmd
+        calls["kwargs"] = kwargs
+        return type("R", (), {"returncode": 0})()
 
-    install_hooks.run_post_install_scripts(tmp_path, False, ["p.sh"])
-    install_hooks.run_pre_install_scripts(tmp_path, False, ["r.sh"])
+    monkeypatch.setattr(install_hooks.subprocess, "run", fake_run)
+    monkeypatch.setattr(install_hooks.sys, "executable", "/fake/python/interpreter")
 
-    kinds = [k for _, k, _ in passed]
-    assert kinds == [install_hooks.CHUB_POST_INSTALL_SCRIPTS_DIR, install_hooks.CHUB_PRE_INSTALL_SCRIPTS_DIR]
-    assert passed[0][2] == ["p.sh"] and passed[1][2] == ["r.sh"]
+    install_hooks.run_post_install_scripts(tmp_path, False, ["script.py"])
+
+    # should use sys.executable for .py files
+    assert len(calls["cmd"]) == 2
+    assert calls["cmd"][0] == "/fake/python/interpreter"
+    assert Path(calls["cmd"][1]).name == "script.py"
+    assert calls["kwargs"].get("check") is False
+
+
+def test_non_python_script_direct_execution(monkeypatch, tmp_path):
+    base = tmp_path / "scripts" / "pre"
+    base.mkdir(parents=True)
+    (base / "script.sh").write_text("#!/bin/bash\necho ok")
+
+    calls = {}
+
+    def fake_run(cmd, **kwargs):
+        calls["cmd"] = cmd
+        return type("R", (), {"returncode": 0})()
+
+    monkeypatch.setattr(install_hooks.subprocess, "run", fake_run)
+
+    install_hooks.run_pre_install_scripts(tmp_path, False, ["script.sh"])
+
+    # should execute directly, not with sys.executable
+    assert len(calls["cmd"]) == 1
+    assert Path(calls["cmd"][0]).name == "script.sh"
+
+
+def test_python_script_uppercase_extension(monkeypatch, tmp_path):
+    base = tmp_path / "scripts" / "post"
+    base.mkdir(parents=True)
+    (base / "SCRIPT.PY").write_text("print('hello')")
+
+    calls = {}
+
+    def fake_run(cmd, **kwargs):
+        calls["cmd"] = cmd
+        return type("R", (), {"returncode": 0})()
+
+    monkeypatch.setattr(install_hooks.subprocess, "run", fake_run)
+    monkeypatch.setattr(install_hooks.sys, "executable", "/fake/python")
+
+    install_hooks.run_post_install_scripts(tmp_path, False, ["SCRIPT.PY"])
+
+    # should handle uppercase .PY extension
+    assert calls["cmd"][0] == "/fake/python"
+    assert Path(calls["cmd"][1]).name == "SCRIPT.PY"
+
+
+def test_dry_run_prints_message_and_skips_execution(monkeypatch, tmp_path, capsys):
+    base = tmp_path / "scripts" / "post"
+    base.mkdir(parents=True)
+    (base / "script.sh").write_text("echo hello")
+
+    run_called = []
+    monkeypatch.setattr(install_hooks.subprocess, "run", lambda *a, **k: run_called.append(True))
+
+    install_hooks.run_post_install_scripts(tmp_path, dry_run=True, scripts=["script.sh"])
+
+    assert not run_called
+    out = capsys.readouterr().out
+    assert "[dry-run] Would install post-install script: script.sh" in out
+
+
+def test_dry_run_pre_install(monkeypatch, tmp_path, capsys):
+    base = tmp_path / "scripts" / "pre"
+    base.mkdir(parents=True)
+    (base / "prep.sh").write_text("echo prep")
+
+    run_called = []
+    monkeypatch.setattr(install_hooks.subprocess, "run", lambda *a, **k: run_called.append(True))
+
+    install_hooks.run_pre_install_scripts(tmp_path, dry_run=True, scripts=["prep.sh"])
+
+    assert not run_called
+    out = capsys.readouterr().out
+    assert "[dry-run] Would install pre-install script: prep.sh" in out

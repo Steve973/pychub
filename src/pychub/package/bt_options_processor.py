@@ -5,7 +5,7 @@ from importlib.metadata import PackageNotFoundError, version as get_version
 from pathlib import Path
 
 from .chubproject import load_chubproject, save_chubproject
-from .packager import build_chub
+from .packager import build_chub, analyze_compatibility
 from ..model.chubproject_model import ChubProject
 
 
@@ -33,17 +33,25 @@ def process_options(args):
         print(f"pychub: {version}")
         return
 
-    chubproject = None
     if args.chubproject:
         chubproject_path = Path(args.chubproject).expanduser().resolve()
         chubproject = parse_chubproject(chubproject_path)
+        chubproject = ChubProject.override_from_cli_args(chubproject, vars(args))
+    else:
+        chubproject = ChubProject.from_cli_args(vars(args))
 
-    build_args = ChubProject.override_from_cli_args(chubproject, vars(args)) if chubproject else ChubProject.from_cli_args(vars(args))
+    if args.analyze_compatibility:
+        combos = analyze_compatibility(chubproject)
+        if not combos:
+            print("WARNING: No valid compatibility targets found!")
+        else:
+            print("Supported compatibility targets:")
+            for combo in combos:
+                print(f"  {combo}")
+        sys.exit(0)
 
     if args.chubproject_save:
         chubproject_path = Path(args.chubproject_save).expanduser().resolve()
-        save_chubproject(build_args, chubproject_path, overwrite=True, make_parents=True)
+        save_chubproject(chubproject, chubproject_path, overwrite=True, make_parents=True)
 
-    build_chub(build_args)
-
-
+    build_chub(chubproject)

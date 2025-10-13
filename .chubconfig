@@ -1,0 +1,12 @@
+name: test-pkg
+version: 0.1.0
+entrypoint: test_pkg.greet:main
+scripts:
+  pre: []
+  post: []
+includes: []
+wheels: {}
+compatibility:
+  targets:
+  - py3-none-any
+metadata: {}

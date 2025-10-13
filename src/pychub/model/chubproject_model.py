@@ -2,11 +2,20 @@ from __future__ import annotations
 
 import glob
 import os
+import re
+import sys
+import zipfile
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING
 
-from pychub.model.chubconfig_model import dataclass
 from pychub.model.includes_model import IncludeSpec
 from pychub.model.scripts_model import Scripts
+
+if TYPE_CHECKING:
+    from dataclasses import dataclass as dataclass
+else:
+    from .dataclass_shim import dataclass
 
 
 def resolve_wheels(mw: str | None = None, aw: list[str] | None = None) -> tuple[str | None, list[str]]:
@@ -19,11 +28,34 @@ def resolve_wheels(mw: str | None = None, aw: list[str] | None = None) -> tuple[
     return main_wheel, additional_wheels
 
 
+def get_wheel_name_version(wheel_path: Path) -> tuple[str, str]:
+    if wheel_path is None:
+        raise ValueError("Cannot get wheel name and version: no wheel path provided")
+    with zipfile.ZipFile(wheel_path) as zf:
+        metadata_file = next((f for f in zf.namelist() if f.endswith('METADATA')), None)
+        if metadata_file is None:
+            raise ValueError("No METADATA file found in wheel")
+
+        with zf.open(metadata_file) as f:
+            for line in f:
+                decoded = line.decode('utf-8')
+                if decoded.startswith("Name: "):
+                    name = decoded.split("Name: ", 1)[1].strip()
+                elif decoded.startswith("Version: "):
+                    version = decoded.split("Version: ", 1)[1].strip()
+                if 'name' in locals() and 'version' in locals():
+                    return name, version
+
+    raise ValueError("Name and Version not found in wheel METADATA")
+
+
 @dataclass(slots=True)
 class ChubProject:
     # flat fields (one-shot build config)
+    name: Optional[str] = None
+    version: Optional[str] = None
     wheel: Optional[str] = None
-    add_wheels: List[str] = None  # normalized to list in factories
+    add_wheels: List[str] = None
     chub: Optional[str] = None
     entrypoint: Optional[str] = None
     includes: List["IncludeSpec"] = None
@@ -40,10 +72,14 @@ class ChubProject:
             return ChubProject(add_wheels=[], includes=[], metadata={}, scripts=Scripts())
 
         main_wheel, additional_wheels = resolve_wheels(m.get("wheel"), m.get("add_wheels") or [])
-
+        wheel_name, wheel_version = get_wheel_name_version(main_wheel)
+        name = m.get("name") or wheel_name
+        version = m.get("version") or wheel_version
         includes = [IncludeSpec.parse(item) for item in (m.get("includes") or [])]
 
         return ChubProject(
+            name=name,
+            version=version,
             wheel=main_wheel,
             add_wheels=additional_wheels,
             chub=str(m["chub"]) if m.get("chub") else None,
@@ -54,15 +90,14 @@ class ChubProject:
             scripts=Scripts.from_mapping(m.get("scripts")))
 
     @staticmethod
-    def from_toml_document(doc: Mapping[str, Any]) -> "ChubProject":
+    def from_toml_document(doc: Mapping[str, Any], toml_name: str = None) -> "ChubProject":
         """
         Load with flexible namespacing:
-          1) [package]
-          2) [pychub.package]
-          3) any table whose dotted path endswith ".pychub.package"
-          4) if exactly one table looks package-like, use it; otherwise error
+          1) [tool.pychub.package] if pyproject.toml
+          2) [tool.pychub.package] or [pychub.package] or [package] if chubproject.toml
+          3) the entire document if the previous namespace is not found, and is chubproject.toml
         """
-        tbl = ChubProject._select_package_table(doc)
+        tbl = ChubProject._select_package_table(doc, toml_name)
         return ChubProject.from_mapping(tbl)
 
     @staticmethod
@@ -78,9 +113,13 @@ class ChubProject:
         """
         # scalars
         wheel = str(args.get("wheel")) if args.get("wheel") else None
-        chub = str(args.get("chub") ) if args.get("chub") else None
+        chub = str(args.get("chub")) if args.get("chub") else None
         entrypoint = str(args.get("entrypoint")) if args.get("entrypoint") else None
         verbose = bool(args.get("verbose", False))
+
+        wheel_name, wheel_version = get_wheel_name_version(wheel) if wheel is not None else (None, None)
+        name = args.get("name") or wheel_name
+        version = args.get("version") or wheel_version
 
         # lists
         add_wheels = ChubProject._comma_split_maybe(args.get("add_wheel"))
@@ -111,14 +150,16 @@ class ChubProject:
             metadata[k] = [p.strip() for p in v.split(",")] if "," in v else v
 
         return ChubProject(
-        wheel=wheel,
-        add_wheels=add_wheels,
-        chub=chub,
-        entrypoint=entrypoint,
-        includes=includes,
-        verbose=verbose,
-        metadata=metadata,
-        scripts=scripts)
+            name=name,
+            version=version,
+            wheel=wheel,
+            add_wheels=add_wheels,
+            chub=chub,
+            entrypoint=entrypoint,
+            includes=includes,
+            verbose=verbose,
+            metadata=metadata,
+            scripts=scripts)
 
     # ------------------- immutable merges -------------------
 
@@ -133,22 +174,22 @@ class ChubProject:
         """
         inc = ChubProject.from_cli_args(args)
 
-        wheel      = existing.wheel if inc.wheel is None else inc.wheel
-        chub       = inc.chub or existing.chub
+        wheel = existing.wheel if inc.wheel is None else inc.wheel
+        chub = inc.chub or existing.chub
         entrypoint = existing.entrypoint if inc.entrypoint is None else inc.entrypoint
-        verbose    = existing.verbose or inc.verbose
+        verbose = existing.verbose or inc.verbose
 
         add_wheels = ChubProject._dedup([*(existing.add_wheels or []), *(inc.add_wheels or [])])
-        includes   = ChubProject._dedup_includes(existing.includes or [], inc.includes or [])
+        includes = ChubProject._dedup_includes(existing.includes or [], inc.includes or [])
 
         # scripts: only extend if the caller provided some
         provided_scripts = bool(inc.scripts and (inc.scripts.pre or inc.scripts.post))
         if provided_scripts:
             scripts = Scripts().from_mapping({
                 "pre": ChubProject._dedup([*(existing.scripts.pre if existing.scripts else []),
-                                          *(inc.scripts.pre if inc.scripts else [])]),
+                                           *(inc.scripts.pre if inc.scripts else [])]),
                 "post": ChubProject._dedup([*(existing.scripts.post if existing.scripts else []),
-                                          *(inc.scripts.post if inc.scripts else [])])
+                                            *(inc.scripts.post if inc.scripts else [])])
             })
         else:
             scripts = existing.scripts or Scripts()
@@ -180,13 +221,13 @@ class ChubProject:
         """
         inc = ChubProject.from_cli_args(args)
 
-        wheel      = inc.wheel if inc.wheel is not None else existing.wheel
-        chub       = inc.chub or existing.chub
+        wheel = inc.wheel if inc.wheel is not None else existing.wheel
+        chub = inc.chub or existing.chub
         entrypoint = inc.entrypoint if inc.entrypoint is not None else existing.entrypoint
-        verbose    = existing.verbose or inc.verbose
+        verbose = existing.verbose or inc.verbose
 
         add_wheels = inc.add_wheels if inc.add_wheels else (existing.add_wheels or [])
-        includes   = inc.includes   if inc.includes   else (existing.includes or [])
+        includes = inc.includes if inc.includes else (existing.includes or [])
 
         scripts = existing.scripts or Scripts()
         if inc.scripts and (inc.scripts.pre or inc.scripts.post):
@@ -208,53 +249,64 @@ class ChubProject:
     # ------------------- namespacing helpers -------------------
 
     @staticmethod
-    def _select_package_table(doc: Mapping[str, Any]) -> Mapping[str, Any]:
-        # 1) exact [package]
-        pkg = doc.get("package")
-        if isinstance(pkg, Mapping):
-            return pkg
-
-        # 2) scan for pychub.package or any *.pychub.package
-        candidates: List[Tuple[int, str, Mapping[str, Any]]] = []
-        for path, tbl in ChubProject._walk_tables("", doc):
-            if path == "pychub.package":
-                candidates.append((0, path, tbl))
-            elif path.endswith(".pychub.package"):
-                candidates.append((1, path, tbl))
-
-        if candidates:
-            candidates.sort(key=lambda t: t[0])
-            best_score = candidates[0][0]
-            best = [c for c in candidates if c[0] == best_score]
-            if len(best) > 1:
-                opts = ", ".join(p for _, p, _ in best)
-                raise ValueError(f"Ambiguous config tables: {opts}. Choose and use only one.")
-            return best[0][2]
-
-        # 3) last resort: unique package-like table
-        lookalikes = [(p, t) for p, t in ChubProject._walk_tables("", doc) if ChubProject._looks_like_pkg_table(t)]
-        if len(lookalikes) == 1:
-            return lookalikes[0][1]
-        if not lookalikes:
-            raise ValueError(
-                "No package-like table found. Provide [package], [pychub.package], "
-                "a table ending with .pychub.package, or use a flattened config."
-            )
-        paths = ", ".join(p for p, _ in lookalikes)
-        raise ValueError(f"Multiple package-like tables found: {paths}. Choose and use only one.")
+    def _select_package_table(doc: Mapping[str, Any], toml_name: str = None) -> Mapping[str, Any] | None:
+        # 1) if pyproject.toml, exact [tool.pychub.package] in pyproject.toml
+        if toml_name == "pyproject.toml":
+            pkg = doc.get("tool", {}).get("pychub", {}).get("package")
+            if isinstance(pkg, Mapping):
+                if pkg.get("enabled") is False:
+                    print("WARNING: [tool.pychub.package.enabled] is False -- skipping pychub packaging")
+                    return None
+                else:
+                    print("INFO: [tool.pychub.package] is enabled -- using pychub packaging")
+                    return pkg
+            else:
+                print("WARNING: [tool.pychub.package] not found in pyproject.toml -- skipping pychub packaging")
+                return None
+        # 2) exact [tool.pychub.package] [pychub.package] or [package] in chubproject.toml
+        elif re.fullmatch(r".*chubproject.*\.toml", toml_name):
+            pkg = doc.get("tool", doc).get("pychub", doc).get("package")
+            if isinstance(pkg, Mapping):
+                print(f"INFO: [pychub.package] is enabled in {toml_name} -- using pychub packaging")
+                return pkg
+            else:
+                # 3) flat table in chubproject.toml
+                print(f"INFO: flat table found in {toml_name} -- using pychub packaging")
+                return doc
+        else:
+            print(f"WARNING: unrecognized document detected: {toml_name} -- skipping pychub packaging")
+            return None
 
     @staticmethod
-    def _walk_tables(prefix: str, tbl: Mapping[str, Any]):
-        yield prefix, tbl
-        for k, v in tbl.items():
-            if isinstance(v, Mapping):
-                sub = f"{prefix}.{k}" if prefix else str(k)
-                yield from ChubProject._walk_tables(sub, v)
+    def determine_table_path(chubproject_path: Path, table_arg: str | None) -> str | None:
+        """
+        Determine the effective table path to use for loading the config.
 
-    @staticmethod
-    def _looks_like_pkg_table(tbl: Mapping[str, Any]) -> bool:
-        anchors = ("wheel", "add_wheels", "entrypoint", "includes", "include", "scripts", "metadata", "chub")
-        return any(k in tbl for k in anchors)
+        - If the filename is pyproject.toml → always return 'tool.pychub.package'
+        - If table_arg is None → always return 'tool.pychub.package' (it is the default)
+        - If table_arg == 'flat' → return None (flat table)
+        - Else → return the dotted path (e.g., 'pychub.package', 'package')
+        """
+        default_table = "tool.pychub.package"
+
+        if chubproject_path.name == "pyproject.toml":
+            return default_table
+
+        if not re.fullmatch(r"(.*[-_.])?chubproject([-_.].*)?\.toml", chubproject_path.name):
+            raise ValueError(f"Invalid chubproject_path: {chubproject_path!r}")
+
+        if table_arg is None:
+            return default_table
+
+        normalized_name = table_arg.strip().lower()
+
+        if normalized_name == "flat":
+            return None
+
+        if re.fullmatch(r"^(tool\.)?(pychub\.)?package$", normalized_name):
+            return normalized_name
+
+        raise ValueError(f"Invalid table_arg: {table_arg!r}")
 
     # ------------------- small utils -------------------
 
@@ -292,7 +344,8 @@ class ChubProject:
         seen, out = set(), []
         for s in items:
             if s not in seen:
-                seen.add(s); out.append(s)
+                seen.add(s);
+                out.append(s)
         return out
 
     @staticmethod
@@ -303,11 +356,11 @@ class ChubProject:
         for spec in [*(a or []), *(b or [])]:
             key = (spec.src, spec.dest)
             if key not in seen:
-                seen.add(key); out.append(spec)
+                seen.add(key);
+                out.append(spec)
         return out
 
     # ------------------- instance methods -------------------
-
 
     def to_mapping(self) -> Dict[str, Any]:
         """Dump back into a plain mapping (for export/round-tripping)."""

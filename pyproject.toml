@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "pychub"
-version = "1.1.1"
+version = "2.0.0"
 description = "Make a Python-native .chub installer from wheels and their dependencies."
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
@@ -45,6 +45,8 @@ keywords = [
 [project.urls]
 Homepage = "https://github.com/Steve973/pychub"
 Source = "https://github.com/Steve973/pychub/tree/main"
+Changelog = "https://github.com/Steve973/pychub/blob/main/CHANGELOG.md"
+ReleaseNotes = "https://github.com/Steve973/pychub/blob/main/RELEASE_NOTES.md"
 
 [project.scripts]
 pychub = "pychub.package.cli:main"
@@ -57,9 +59,12 @@ pyyaml = ">=6.0.3"
 attrs = ">=25.3.0"
 tomli = { version = ">=2.2", markers = "python_version < '3.11'" }
 tomli-w = ">=1.2.0"
+packaging = ">=25.0"
+requests = ">=2.32.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.4.1"
+pytest-cov = ">=7.0.0"
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "-q", "--import-mode=importlib"]

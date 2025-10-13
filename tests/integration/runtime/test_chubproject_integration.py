@@ -1,13 +1,24 @@
-from pychub.package.chubproject import load_chubproject
+from pathlib import Path
+
+import pytest
+
+from pychub.package.chubproject import load_chubproject, save_chubproject, ChubProject
 from tests.integration._asserts import assert_rc_ok
 from tests.integration.conftest import run_build_cli
 
+# --- reader: tomllib on 3.11+, tomli on 3.9–3.10 ---
+try:
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore
 
-def test_chubproject_save_roundtrip(test_env, tmp_path):
-    """Verify that --chubproject-save writes a valid file, and it can be reloaded cleanly."""
+
+@pytest.fixture
+def saved_chubproject_file(test_env, tmp_path):
+    """Run a real build to generate a saved chubproject TOML file."""
     test_proj = test_env["test_pkg_dir"]
     wheel = test_env["wheel_path"]
-    out_path = tmp_path / "saved_config.toml"
+    out_path = tmp_path / "test_chubproject_save.toml"
 
     result, _ = run_build_cli(
         wheel,
@@ -17,14 +28,200 @@ def test_chubproject_save_roundtrip(test_env, tmp_path):
         metadata={"author": "steve", "tags": ["foo", "bar"]},
         includes=[f"{test_proj}/includes/README.md::altname"],
         scripts_post=[f"{test_proj}/scripts/post_install.sh"],
+        scripts_pre=[f"{test_proj}/scripts/pre_check.sh"],
+        verbose=True,
     )
 
     assert_rc_ok(result)
-    assert out_path.exists(), "Saved chubproject.toml not found"
+    assert out_path.exists()
+    return {"path": out_path, "wheel": wheel, "proj_dir": test_proj}
 
-    # Reload the saved project
-    reloaded = load_chubproject(out_path)
-    assert reloaded.metadata.get("author") == "steve"
-    assert reloaded.metadata.get("tags") == ["foo", "bar"]
-    assert any("altname" in i.as_string() for i in reloaded.includes)
-    assert any("post_install.sh" in str(p) for p in (reloaded.scripts.post or None))
+
+@pytest.fixture
+def loaded_project(saved_chubproject_file):
+    return load_chubproject(saved_chubproject_file["path"])
+
+
+def test_wheel_path_matches_input(loaded_project, saved_chubproject_file):
+    assert loaded_project.wheel == saved_chubproject_file["wheel"].as_posix()
+
+
+def test_metadata_fields_roundtrip(loaded_project):
+    assert loaded_project.metadata["author"] == "steve"
+    assert loaded_project.metadata["tags"] == ["foo", "bar"]
+    assert "__file__" in loaded_project.metadata
+
+
+def test_includes_are_parsed_correctly(loaded_project):
+    includes = loaded_project.includes
+    assert any(i.dest == "altname" for i in includes)
+
+
+def test_scripts_pre_and_post_are_populated(loaded_project):
+    pre = loaded_project.scripts.pre or []
+    post = loaded_project.scripts.post or []
+    assert any("pre_check.sh" in s for s in pre)
+    assert any("post_install.sh" in s for s in post)
+
+
+def test_verbose_flag_is_preserved(loaded_project):
+    assert loaded_project.verbose is True
+
+
+def test_save_roundtrip_toml_equivalence(saved_chubproject_file, loaded_project, tmp_path):
+    original_path = saved_chubproject_file["path"]
+    second_path = tmp_path / "roundtrip.toml"
+
+    save_chubproject(loaded_project, second_path, overwrite=True)
+
+    doc1 = tomllib.loads(original_path.read_text("utf-8"))["tool"]["pychub"]["package"]
+    doc2 = tomllib.loads(second_path.read_text("utf-8"))["tool"]["pychub"]["package"]
+
+    doc1["metadata"].pop("__file__", None)
+    doc2["metadata"].pop("__file__", None)
+
+    assert doc1 == doc2
+
+
+def test_save_refuses_to_overwrite_existing_file(tmp_path):
+    path = tmp_path / "existing.toml"
+    path.write_text("dummy")
+
+    with pytest.raises(Exception) as e:
+        save_chubproject(ChubProject.from_mapping({}), path)
+
+    assert "Refusing to overwrite" in str(e.value)
+
+
+def test_save_fails_if_no_writer(monkeypatch):
+    import pychub.package.chubproject as chubproject
+    monkeypatch.setattr(chubproject, "_TOML_WRITER", None)
+
+    with pytest.raises(Exception) as e:
+        save_chubproject(ChubProject.from_mapping({}), Path("any.toml"))
+
+    assert "Saving requires a TOML writer" in str(e.value)
+
+
+def test_pyproject_valid_tool_package():
+    doc = {
+        "tool": {
+            "pychub": {
+                "package": {"wheel": "test.whl"}
+            }
+        }
+    }
+    result = ChubProject._select_package_table(doc, "pyproject.toml")
+    assert result == {"wheel": "test.whl"}
+
+
+def test_pyproject_explicitly_disabled(capfd):
+    doc = {
+        "tool": {
+            "pychub": {
+                "package": {"enabled": False}
+            }
+        }
+    }
+    result = ChubProject._select_package_table(doc, "pyproject.toml")
+    assert result is None
+    out = capfd.readouterr().out
+    assert "enabled" in out and "skipping" in out
+
+
+def test_pyproject_missing_package_table(capfd):
+    doc = {
+        "tool": {
+            "pychub": {}
+        }
+    }
+    result = ChubProject._select_package_table(doc, "pyproject.toml")
+    assert result is None
+    assert "not found" in capfd.readouterr().out
+
+
+def test_chubproject_tool_table_exists():
+    doc = {
+        "tool": {
+            "pychub": {
+                "package": {"wheel": "wheel.whl"}
+            }
+        }
+    }
+    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    assert result == {"wheel": "wheel.whl"}
+
+
+def test_chubproject_pychub_package_root_level():
+    doc = {
+        "pychub": {
+            "package": {"wheel": "wheel.whl"}
+        }
+    }
+    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    assert result == {"wheel": "wheel.whl"}
+
+
+def test_chubproject_package_flat():
+    doc = {
+        "package": {"wheel": "pkg.whl"}
+    }
+    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    assert result == {"wheel": "pkg.whl"}
+
+
+def test_chubproject_flat_document_used_as_fallback(capfd):
+    doc = {
+        "wheel": "flat.whl",
+        "entrypoint": "main:run"
+    }
+    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    assert result == doc
+    assert "flat table" in capfd.readouterr().out
+
+
+def test_unrecognized_filename_is_skipped(capfd):
+    doc = {"tool": {"pychub": {"package": {"wheel": "test.whl"}}}}
+    result = ChubProject._select_package_table(doc, "weird_name.toml")
+    assert result is None
+    assert "unrecognized" in capfd.readouterr().out
+
+
+@pytest.mark.parametrize("name,arg,expected", [
+    ("pyproject.toml", None, "tool.pychub.package"),
+    ("chubproject.toml", None, "tool.pychub.package"),
+    ("chubproject.build.toml", "flat", None),
+    ("my-chubproject.toml", "flat", None),
+    ("my_chubproject.toml", "flat", None),
+    ("my.chubproject.toml", "flat", None),
+    ("chubproject.toml", "package", "package"),
+    ("chubproject.toml", "tool.pychub.package", "tool.pychub.package"),
+    ("chubproject.toml", "pychub.package", "pychub.package"),
+])
+def test_determine_table_path_valid(name, arg, expected):
+    result = ChubProject.determine_table_path(Path(name), arg)
+    assert result == expected
+
+
+@pytest.mark.parametrize("name,arg", [
+    ("build.toml", None),
+    ("chub_proj.toml", None),
+    ("notachubproject.toml", None),
+    ("config.toml", "flat"),
+    ("myproject.toml", "tool.pychub.package"),
+    ("chubproject.toml", "tool.pychub.packag"),  # typo
+    ("chubproject.toml", "pychub.package.extra"),  # too long
+    ("chubproject.toml", "packge"),  # misspelled
+    ("chubproject.toml", "pysub.package"),
+])
+def test_determine_table_path_invalid(name, arg):
+    with pytest.raises(ValueError):
+        ChubProject.determine_table_path(Path(name), arg)
+
+
+@pytest.mark.parametrize("arg", [
+    "packag", "pychub.packages", "tool.foo.package", "package.extra", "foo", "tool.pysub.package"
+])
+def test_invalid_table_args(arg):
+    with pytest.raises(ValueError, match="Invalid table_arg"):
+        ChubProject.determine_table_path(Path("chubproject.toml"), arg)

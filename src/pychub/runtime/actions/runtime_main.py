@@ -6,15 +6,16 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from .chubconfig import load_chubconfig
-from .discover import discover_wheels
-from .entrypoint import _run_entrypoint_with_python
-from .install import install_wheels
-from .list import list_wheels
-from .install_hooks import run_post_install_scripts, run_pre_install_scripts
-from .unpack import unpack_chub
-from .venv import create_venv, _venv_python
-from .version import show_version
+from pychub.runtime.actions.show_compatibility import show_compatibility
+from pychub.runtime.actions.chubconfig import load_chubconfig
+from pychub.runtime.actions.discover import discover_wheels
+from pychub.runtime.actions.entrypoint import _run_entrypoint_with_python
+from pychub.runtime.actions.install import install_wheels
+from pychub.runtime.actions.list import list_wheels
+from pychub.runtime.actions.install_hooks import run_post_install_scripts, run_pre_install_scripts
+from pychub.runtime.actions.unpack import unpack_chub
+from pychub.runtime.actions.venv import create_venv, _venv_python
+from pychub.runtime.actions.version import show_version
 from ..cli import build_parser
 from ..constants import CHUB_LIBS_DIR
 from ..utils import die
@@ -53,13 +54,15 @@ def main(argv: list[str] | None = None) -> None:
     baked_entrypoint = bundle_config.entrypoint
 
     # Simple info actions
+    if getattr(args, "show-compatibility", False):
+        show_compatibility(bundle_root)
+        return
+
     if getattr(args, "list", False):
         list_wheels(bundle_root, quiet=args.quiet, verbose=args.verbose)
         return
 
     if getattr(args, "unpack", None):
-        if not args.unpack:
-            args.unpack = "."
         unpack_chub(bundle_root, Path(args.unpack))
         return
 
@@ -151,5 +154,5 @@ def main(argv: list[str] | None = None) -> None:
         shutil.rmtree(temp_root, ignore_errors=True)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":   # pragma: no cover
     main()

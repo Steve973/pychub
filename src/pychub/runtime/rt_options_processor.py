@@ -12,6 +12,7 @@ COMMANDS = [
     "quiet",
     "run [ENTRYPOINT]",
     "show-scripts",
+    "show-compatibility"
     "unpack [DIR]",
     "venv DIR",
     "version",
@@ -39,6 +40,26 @@ COMPATIBLE_OPTIONS = {
         "run",
         "verbose"
     ],
+    "help": [
+        "quiet",
+        "verbose"
+    ],
+    "info": [
+        "list",
+        "quiet",
+        "show-compatibility",
+        "show-scripts",
+        "version",
+        "verbose"
+    ],
+    "list": [
+        "info",
+        "quiet",
+        "show-compatibility",
+        "show-scripts",
+        "verbose",
+        "version"
+    ],
     "no-post-scripts": [
         "dry-run",
         "exec",
@@ -69,6 +90,23 @@ COMPATIBLE_OPTIONS = {
         "venv",
         "verbose"
     ],
+    "quiet": [
+        "dry-run",
+        "exec",
+        "help",
+        "info",
+        "list",
+        "no-post-scripts",
+        "no-pre-scripts",
+        "no-scripts",
+        "run",
+        "show-scripts",
+        "show-compatibility",
+        "unpack",
+        "venv",
+        "verbose",
+        "version"
+    ],
     "run": [
         "dry-run",
         "exec",
@@ -79,8 +117,25 @@ COMPATIBLE_OPTIONS = {
         "venv",
         "verbose"
     ],
+    "show-compatibility": [
+        "info",
+        "list",
+        "quiet",
+        "show-scripts",
+        "verbose",
+        "version"
+    ],
+    "show-scripts": [
+        "info",
+        "quiet",
+        "list",
+        "show-compatibility",
+        "verbose",
+        "version"
+    ],
     "unpack": [
         "dry-run",
+        "quiet",
         "verbose"
     ],
     "venv": [
@@ -91,6 +146,31 @@ COMPATIBLE_OPTIONS = {
         "quiet",
         "run",
         "verbose"
+    ],
+    "verbose": [
+        "dry-run",
+        "exec",
+        "help",
+        "info",
+        "list",
+        "no-post-scripts",
+        "no-pre-scripts",
+        "no-scripts",
+        "quiet",
+        "run",
+        "show-scripts",
+        "show-compatibility",
+        "unpack",
+        "venv",
+        "version"
+    ],
+    "version": [
+        "info",
+        "list",
+        "quiet",
+        "show-compatibility",
+        "show-scripts",
+        "verbose"
     ]
 }
 
@@ -99,6 +179,7 @@ INCOMPATIBLE_OPTIONS = {
         "help",
         "info",
         "list",
+        "show-compatibility",
         "show-scripts",
         "version"
     ],
@@ -106,6 +187,7 @@ INCOMPATIBLE_OPTIONS = {
         "help",
         "info",
         "list",
+        "show-compatibility",
         "show-scripts",
         "unpack",
         "venv",
@@ -119,13 +201,12 @@ INCOMPATIBLE_OPTIONS = {
         "no-post-scripts",
         "no-pre-scripts",
         "no-scripts",
-        "quiet",
         "run",
+        "show-compatibility",
         "show-scripts",
         "unpack",
         "venv",
-        "version",
-        "verbose"
+        "version"
     ],
     "info": [
         "dry-run",
@@ -135,7 +216,6 @@ INCOMPATIBLE_OPTIONS = {
         "no-pre-scripts",
         "no-scripts",
         "run",
-        "show-scripts",
         "unpack",
         "venv"
     ],
@@ -147,15 +227,14 @@ INCOMPATIBLE_OPTIONS = {
         "no-pre-scripts",
         "no-scripts",
         "run",
-        "show-scripts",
         "unpack",
-        "venv",
-        "version"
+        "venv"
     ],
     "no-post-scripts": [
         "help",
         "info",
         "list",
+        "show-compatibility",
         "show-scripts",
         "unpack",
         "version"
@@ -164,6 +243,7 @@ INCOMPATIBLE_OPTIONS = {
         "help",
         "info",
         "list",
+        "show-compatibility",
         "show-scripts",
         "unpack",
         "version"
@@ -172,14 +252,17 @@ INCOMPATIBLE_OPTIONS = {
         "help",
         "info",
         "list",
+        "show-compatibility",
         "show-scripts",
         "unpack",
         "version"
     ],
+    "quiet": [],
     "run": [
         "help",
         "info",
         "list",
+        "show-compatibility",
         "show-scripts",
         "unpack",
         "version"
@@ -188,15 +271,23 @@ INCOMPATIBLE_OPTIONS = {
         "dry-run",
         "exec",
         "help",
-        "info",
-        "list",
         "no-post-scripts",
         "no-pre-scripts",
         "no-scripts",
         "run",
         "unpack",
-        "venv",
-        "version"
+        "venv"
+    ],
+    "show-compatibility": [
+        "dry-run",
+        "exec",
+        "help",
+        "no-post-scripts",
+        "no-pre-scripts",
+        "no-scripts",
+        "run",
+        "unpack",
+        "venv"
     ],
     "unpack": [
         "exec",
@@ -207,6 +298,7 @@ INCOMPATIBLE_OPTIONS = {
         "no-pre-scripts",
         "no-scripts",
         "run",
+        "show-compatibility",
         "show-scripts",
         "venv",
         "version"
@@ -216,26 +308,24 @@ INCOMPATIBLE_OPTIONS = {
         "help",
         "info",
         "list",
+        "show-compatibility",
         "show-scripts",
         "unpack",
         "version"
     ],
+    "verbose": [],
     "version": [
         "dry-run",
         "exec",
         "help",
-        "info",
-        "list",
         "no-post-scripts",
         "no-pre-scripts",
         "no-scripts",
         "run",
-        "show-scripts",
         "unpack",
         "venv"
     ]
 }
-
 # ---------- central validation + implications ----------
 
 from argparse import Namespace

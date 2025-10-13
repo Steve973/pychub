@@ -69,9 +69,13 @@ def build_parser() -> argparse.ArgumentParser:
                    action="store_true",
                    help="Show the pre/post install scripts and exit")
 
+    p.add_argument("-c", "--show-compatibility",
+                   action="store_true",
+                   help="Show the interpreter/ami/platform compatibility and exit")
+
     p.add_argument("-u", "--unpack",
                    nargs="?",
-                   const="",
+                   const=".",
                    metavar="DIR",
                    help=(
                        "Extract .chubconfig and all wheel-related files; if "

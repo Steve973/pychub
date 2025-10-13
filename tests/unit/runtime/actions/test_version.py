@@ -35,7 +35,7 @@ def test_show_version_with_installed_package(monkeypatch, capsys, fake_wheel, tm
     assert called["pkg"] == "pychub"  # ensure correct dist is queried
 
 
-def test_show_version_when_pychubby_not_installed(monkeypatch, capsys, tmp_path):
+def test_show_version_when_pychub_not_installed(monkeypatch, capsys, tmp_path):
     def raise_not_found(pkg):
         raise version.im.PackageNotFoundError
 

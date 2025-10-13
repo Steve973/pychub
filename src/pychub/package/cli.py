@@ -13,6 +13,7 @@ def main():
 
     parser.add_argument(
         "wheel",
+        nargs="?",
         type=Path,
         help="Path to the .whl file")
 
@@ -23,6 +24,11 @@ def main():
         type=Path,
         help="One or more additional wheels to include",
         action="append")
+
+    parser.add_argument(
+        "--analyze-compatibility",
+        action="store_true",
+        help="Analyze target system compatibility and exit")
 
     parser.add_argument(
         "-c",
@@ -39,6 +45,12 @@ def main():
         "--chubproject-save",
         type=Path,
         help="Optional path to output options config to chubproject.toml")
+
+    parser.add_argument(
+        "-t",
+        "--table",
+        type=str,
+        help="Optional table to use for options config (defaults to 'tool.pychub.package')")
 
     parser.add_argument(
         "-e",
@@ -90,5 +102,5 @@ def main():
     process_options(parser.parse_args())
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

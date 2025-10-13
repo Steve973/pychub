@@ -144,23 +144,54 @@ network*.
 
 ## ⚠️ Platform Compatibility and Wheel Portability
 
-A `.chub` file is only portable across environments if **all** bundled wheels are
-universal. That means:
+When pychub performs platform compatibility analysis, it resolves and analyzes
+the **entire dependency tree** for the project being packaged. For each
+dependency, it downloads **all available wheel variants** (not just the one
+matching the current environment) and evaluates their compatibility tags.
 
-- Pure-Python wheels (`py3-none-any`)
-- Platform-independent `manylinux` wheels
-- Universal2 wheels (for macOS)
+A `.chub` is considered compatible with a given platform only if there exists a
+**complete set of compatible wheels** (for all dependencies) for that platform’s
+interpreter, ABI, and platform tag. These compatibility combinations are derived
+automatically and embedded in the `.chubconfig` metadata.
 
-If your package or its dependencies include **compiled extensions**
-(e.g., numpy, Pillow, pydantic-core), the resulting `.chub` will only work on
-the platform it was built for — and only with the matching Python version and
-ABI.
+If all dependencies provide a universal wheel (`py3-none-any`), pychub will
+generate a single universal compatibility target (`py3-none-any`). Otherwise,
+it will emit `.chubconfig` extensions per supported target combo—e.g.,
 
-In these cases, the `.chub` file is **not cross-platform**. In an upcoming
-release, pychub will warn or fail on such builds unless explicitly overridden.
+```
+cp310-cp310-manylinux_2_17_x86_64.chubconfig
+cp311-cp311-macosx_11_0_x86_64.chubconfig
+```
 
-In practice, many popular packages include native extensions, so full
-cross-platform compatibility is rare unless your dependencies are pure Python.
+These extension files are included in the `.chub` file, and they list only the
+wheels and metadata relevant for that target environment (and any universal
+wheels that apply to that environment).
+
+At runtime, pychub will determine the interpreter, ABI, and platform that
+correspond to the target environment. It will use the main `.chubconfig` file,
+and the appropriate extension file to perform the installation.
+
+### Example (What Happens At Build Time)
+
+If you run `pychub build` for a package that depends on:
+
+- `depA`, which has both universal and platform-specific wheels
+- `depB`, which only has platform-specific wheels
+
+Then pychub will determine which `{interpreter, abi, platform}` triples
+have **complete coverage** across all dependencies. Only those combos will
+be included in the final archive.
+
+Any target environment that matches one of these combinations can install
+the `.chub` deterministically with no network access.
+
+**Note**: If even one dependency lacks a universal or platform-specific wheel
+for a given combo, that combination is excluded from the `.chub`.
+
+---
+
+This makes pychub **safe by default**: it won’t emit a “cross-platform” archive
+unless it can actually be installed across those platforms.
 
 ---
 
@@ -221,20 +252,24 @@ dependencies into a single `.chub` file.
 
     usage: pychub <wheel> [build options]
 
-| Option               | Short Form | Description                                                | Repeatable |
-|----------------------|------------|------------------------------------------------------------|------------|
-| `<wheel>`            | N/A        | Path to the main wheel file to process                     | no         |
-| `--add-wheel`        | `-a`       | Optional path to a wheel to add (plus deps)                | yes        |
-| `--chub`             | `-c`       | Optional path to the output `.chub` file                   | no         |
-| `--chubproject`      | N/A        | Optional path to `chubproject.toml` as build config source | no         |
-| `--chubproject-save` | N/A        | Optional path to write build config to `chubproject.toml`  | no         |
-| `--entrypoint`       | `-e`       | Optional entrypoint to run after install                   | no         |
-| `--include`          | `-i`       | Optional list of files to include                          | yes        |
-| `--metadata-entry`   | `-m`       | Optional metadata to include in `.chubconfig`              | yes        |
-| `--post-script`      | `-o`       | Optional path to post-install script(s) to include         | yes        |
-| `--pre-script`       | `-p`       | Optional path to pre-install script(s) to include          | yes        |
-| `--verbose`          | `-v`       | Optionally show more information when building             | no         |
-| `--version`          | N/A        | Show version info and exit                                 | no         |
+| Option                    | Short Form | Description                                                | Repeatable |
+|---------------------------|------------|------------------------------------------------------------|------------|
+| `<wheel>`                 | N/A        | Path to the main wheel file to process                     | no         |
+| `--add-wheel`             | `-a`       | Optional path to a wheel to add (plus deps)                | yes        |
+| `--analyze-compatibility` | N/A        | Optionally show interpreter/ami/platform compatibility     | no         |
+| `--chub`                  | `-c`       | Optional path to the output `.chub` file                   | no         |
+| `--chubproject`           | N/A        | Optional path to `chubproject.toml` as build config source | no         |
+| `--chubproject-save`      | N/A        | Optional name portion of the chub file                     | no         |
+| `--chub-name`             | N/A        | Optional path to write build config to `chubproject.toml`  | no         |
+| `--chub-version`          | N/A        | Optional version for the chub file                         | no         |
+| `--entrypoint`            | `-e`       | Optional entrypoint to run after install                   | no         |
+| `--include`               | `-i`       | Optional list of files to include                          | yes        |
+| `--metadata-entry`        | `-m`       | Optional metadata to include in `.chubconfig`              | yes        |
+| `--post-script`           | `-o`       | Optional path to post-install script(s) to include         | yes        |
+| `--pre-script`            | `-p`       | Optional path to pre-install script(s) to include          | yes        |
+| `--verbose`               | `-v`       | Optionally show more information when building             | no         |
+| `--version`               | N/A        | Show version info and exit                                 | no         |
+| `--table`                 | `-t`       | Optional table name when used with `--chubproject-save`    | no         |
 
 Notes:
 - `<wheel>`:
@@ -243,6 +278,11 @@ Notes:
 - `--add-wheel`:
   - Optional for single invocation, but required when appending wheels to an
     existing `.chub`.
+- `--analyze-compatibility`:
+  - Optionally show interpreter/ami/platform compatibility that the built
+    `.chub` file will support.
+  - This is a good way to check that your project is compatible with the
+    target environment, or how limited the compatibility could be.
 - `--chub`:
   - Optional for single invocation, but required when appending wheels to an
     existing `.chub`.
@@ -258,6 +298,20 @@ Notes:
     `chubproject.toml` file.
   - Can be specified along with `--chubproject` to preserve changes if you
     include additional CLI options and arguments.
+  - Can be specified along with `--table` to write the build config to a
+    customized table name in the `chubproject` file.
+  - Formats:
+    - Specify the option with a path:
+      `--chubproject-save /path/to/chubproject.toml`
+- `--chub-name`:
+  - Optional.
+  - Overrides the name portion of the `.chub` file. E.g., "mypackage" in
+    `mypackage-1.0.0.chub`.
+- `--chub-version`:
+  - Optional.
+  - Overrides the version portion of the `.chub` file. E.g., "1.0.0" in
+    `mypackage-1.0.0.chub`.
+- `--entrypoint`:
 - `--entrypoint`:
   - Optional.
   - The value is a single string, and quoted if it contains spaces.
@@ -318,6 +372,17 @@ Notes:
       `--pre-script /path/to/script1.sh,/path/to/script2.sh,/path/to/scriptN.sh`
     - Multiple options for multiple scripts:
       `--pre-script /path/to/script1.sh --pre-script /path/to/script2.sh --pre-script /path/to/scriptN.sh`
+- `--table`:
+  - Optional.
+  - When used with `--chubproject-save`, specifies the name of the table in the
+    `chubproject` file to write to.
+  - When the destination filename is `pyproject.toml`, this argument is ignored,
+    because `tool.pychub.package` is mandatory, and cannot be customized.
+  - Formats:
+    - `flat` means that there will be no table name, and this only applies to a
+       `chubproject` file. Does not apply to `pyproject.toml`.
+    - `tool.pychub.package`, `pychub.package`, and `package` are the three
+      valid table names.
 
 #### Example Usage (build)
 
@@ -470,11 +535,11 @@ includes = [
   "docs/README.md::manuals/",        # Copies to includes/manuals/README.md
   "docs/README.md::manuals/guide.md" # Copies to includes/manuals/guide.md
 ]
-[scripts]
+[package.scripts]
 pre  = ["scripts/pre_check.sh"]
 post = ["scripts/post_install.sh"]
 
-[metadata]
+[package.metadata]
 maintainer = "you@example.com"
 tags = ["http", "client"]
 ```
@@ -497,8 +562,7 @@ example would be written as:
   ```
 - The `package` namespace is optional. Not only is it optional, but namespaces
 like `tool.pychub.package` are also permissible. If you do include a namespace
-it must be `package`, `pychub.package`, or it must end with
-`.pychub.package` (e.g., `tool.pychub.package`).
+it must be `package`, `pychub.package`, or `tool.pychub.package`.
 - Using a `chubproject.toml` file implies that the `.chub` build is one-shot.
 While you *can* append additional wheels to an existing `.chub` file, the file
 entries can only include items at initial build time. If you specify an existing
@@ -520,9 +584,12 @@ repository.
 
 ### Operating a Chub
 
-When you run a `.chub` file directly with Python, it operates in  
-**runtime mode** and installs its bundled wheels into the current  
-Python environment (system Python, venv, conda env, etc.).
+Operating a `.chub` file is a bit like operating heavy machinery. Please make
+sure that you are sober and alert in order to avoid any unintended consequences!
+
+When you run a `.chub` file directly with Python, it operates in**runtime mode**
+and installs its bundled wheels into the currentPython environment (system
+Python, venv, conda env, etc.).
 
     usage: python /path/to/some.chub [runtime options] [-- [entrypoint-args...]]
 
@@ -530,23 +597,24 @@ The `--` token is the POSIX end‑of‑options marker. Everything after `--` is
 *not* parsed by pychub and is forwarded unchanged to the entrypoint process
 selected by `--run` (or the baked‑in entrypoint if none is provided).
 
-| Option               | Short Form | Description                                        |
-|----------------------|------------|----------------------------------------------------|
-| `--dry-run`          | `-d`       | Show actions without performing them               |
-| `--exec`             | `-e`       | Run entrypoint in a temporary venv (deleted after) |
-| `--help`             | `-h`       | Show help and exit                                 |
-| `--info`             | `-i`       | Display `.chub` info and exit                      |
-| `--list`             | `-l`       | List bundled wheels and exit                       |
-| `--no-post-scripts`  |            | Skip post install scripts                          |
-| `--no-pre-scripts`   |            | Skip pre install scripts                           |
-| `--no-scripts`       |            | Skip pre/post install scripts                      |
-| `--quiet`            | `-q`       | Suppress output wherever possible                  |
-| `--run [ENTRYPOINT]` | `-r`       | Run the baked-in or specified `ENTRYPOINT`         |
-| `--show-scripts`     | `-s`       | Show the pre/post install scripts and exit         |
-| `--unpack [DIR]`     | `-u`       | Extract `.chubconfig` and all wheel-related files  |
-| `--venv DIR`         |            | Create a venv and install wheels into it           |
-| `--version`          |            | Show version info and exit                         |
-| `--verbose`          | `-v`       | Extra logs wherever possible                       |
+| Option                 | Short Form | Description                                              |
+|------------------------|------------|----------------------------------------------------------|
+| `--dry-run`            | `-d`       | Show actions without performing them                     |
+| `--exec`               | `-e`       | Run entrypoint in a temporary venv (deleted after)       |
+| `--help`               | `-h`       | Show help and exit                                       |
+| `--info`               | `-i`       | Display `.chub` info and exit                            |
+| `--list`               | `-l`       | List bundled wheels and exit                             |
+| `--no-post-scripts`    |            | Skip post install scripts                                |
+| `--no-pre-scripts`     |            | Skip pre install scripts                                 |
+| `--no-scripts`         |            | Skip pre/post install scripts                            |
+| `--quiet`              | `-q`       | Suppress output wherever possible                        |
+| `--run [ENTRYPOINT]`   | `-r`       | Run the baked-in or specified `ENTRYPOINT`               |
+| `--show-compatibility` | `-c`       | List the supported interpreter/ami/platform combinations |
+| `--show-scripts`       | `-s`       | Show the pre/post install scripts and exit               |
+| `--unpack [DIR]`       | `-u`       | Extract `.chubconfig` and all wheel-related files        |
+| `--venv DIR`           |            | Create a venv and install wheels into it                 |
+| `--version`            |            | Show version info and exit                               |
+| `--verbose`            | `-v`       | Extra logs wherever possible                             |
 
 Notes:
 - `--dry-run`:
@@ -599,6 +667,10 @@ Notes:
     - `--venv` (for persistent venv)
 - `--show-scripts`:
   - Allows verification of arbitrary pre/post install script content.
+- `--show-compatibility`:
+  - Shows the supported interpreter/ami/platform combinations.
+  - This is useful for determining if a `.chub` file is compatible with the
+    current environment, or some other environment in question.
 - `--unpack [DIR]`:
   - Wheels, scripts, includes, and the `.chubconfig` are extracted.
   - Specify a directory as `DIR` to extract to the specified directory.
@@ -619,23 +691,24 @@ Notes:
 
 This table is a helpful compatibility matrix for runtime options.
 
-|                   | `dry-run` | `exec` | `help` | `info` | `list` | `no-post-scripts` | `no-pre-scripts` | `no-scripts` | `quiet` | `run` | `show-scripts` | `unpack` | `venv` | `version` | `verbose` |
-|-------------------|-----------|--------|--------|--------|--------|-------------------|------------------|--------------|---------|-------|----------------|----------|--------|-----------|-----------|
-| `dry-run`         | —         | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | Yes      | Yes    | No        | Yes       |
-| `exec`            | Yes       | —      | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | No       | No     | No        | Yes       |
-| `help`            | No        | No     | —      | No     | No     | No                | No               | No           | No      | No    | No             | No       | No     | No        | No        |
-| `info`            | No        | No     | No     | —      | Yes    | No                | No               | No           | Yes     | No    | No             | No       | No     | No        | Yes       |
-| `list`            | No        | No     | No     | Yes    | —      | No                | No               | No           | Yes     | No    | No             | No       | No     | No        | Yes       |
-| `no-post-scripts` | Yes       | Yes    | No     | No     | No     | —                 | Yes              | Yes          | Yes     | Yes   | No             | No       | Yes    | No        | Yes       |
-| `no-pre-scripts`  | Yes       | Yes    | No     | No     | No     | Yes               | —                | Yes          | Yes     | Yes   | No             | No       | Yes    | No        | Yes       |
-| `no-scripts`      | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | —            | Yes     | Yes   | No             | No       | Yes    | No        | Yes       |
-| `quiet`           | Yes       | Yes    | No     | Yes    | Yes    | Yes               | Yes              | Yes          | —       | Yes   | No             | Yes      | Yes    | Yes       | Yes       |
-| `run`             | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | —     | No             | No       | Yes    | No        | Yes       |
-| `show-scripts`    | No        | No     | No     | No     | No     | No                | No               | No           | No      | No    | —              | No       | No     | No        | No        |
-| `unpack`          | Yes       | No     | No     | No     | No     | No                | No               | No           | Yes     | No    | No             | —        | No     | No        | Yes       |
-| `venv`            | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | No       | —      | No        | Yes       |
-| `version`         | No        | No     | No     | No     | No     | No                | No               | No           | Yes     | No    | No             | No       | No     | —         | Yes       |
-| `verbose`         | Yes       | Yes    | No     | Yes    | Yes    | Yes               | Yes              | Yes          | Yes     | Yes   | No             | Yes      | Yes    | Yes       | —         |
+|                      | `dry-run` | `exec` | `help` | `info` | `list` | `no-post-scripts` | `no-pre-scripts` | `no-scripts` | `quiet` | `run` | `show-scripts` | `show-compatibility` | `unpack` | `venv` | `version` | `verbose` |
+|----------------------|-----------|--------|--------|--------|--------|-------------------|------------------|--------------|---------|-------|----------------|----------------------|----------|--------|-----------|-----------|
+| `dry-run`            | —         | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | No                   | Yes      | Yes    | No        | Yes       |
+| `exec`               | Yes       | —      | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | No                   | No       | No     | No        | Yes       |
+| `help`               | No        | No     | —      | No     | No     | No                | No               | No           | No      | No    | No             | No                   | No       | No     | No        | No        |
+| `info`               | No        | No     | No     | —      | Yes    | No                | No               | No           | Yes     | No    | No             | No                   | No       | No     | No        | Yes       |
+| `list`               | No        | No     | No     | Yes    | —      | No                | No               | No           | Yes     | No    | No             | No                   | No       | No     | No        | Yes       |
+| `no-post-scripts`    | Yes       | Yes    | No     | No     | No     | —                 | Yes              | Yes          | Yes     | Yes   | No             | No                   | No       | Yes    | No        | Yes       |
+| `no-pre-scripts`     | Yes       | Yes    | No     | No     | No     | Yes               | —                | Yes          | Yes     | Yes   | No             | No                   | No       | Yes    | No        | Yes       |
+| `no-scripts`         | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | —            | Yes     | Yes   | No             | No                   | No       | Yes    | No        | Yes       |
+| `quiet`              | Yes       | Yes    | No     | Yes    | Yes    | Yes               | Yes              | Yes          | —       | Yes   | No             | No                   | Yes      | Yes    | Yes       | Yes       |
+| `run`                | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | —     | No             | No                   | No       | Yes    | No        | Yes       |
+| `show-scripts`       | No        | No     | No     | No     | No     | No                | No               | No           | No      | No    | —              | No                   | No       | No     | No        | No        |
+| `show-compatibility` | No        | No     | No     | No     | No     | No                | No               | No           | No      | No    | No             | -                    | No       | No     | No        | Yes       |
+| `unpack`             | Yes       | No     | No     | No     | No     | No                | No               | No           | Yes     | No    | No             | No                   | —        | No     | No        | Yes       |
+| `venv`               | Yes       | Yes    | No     | No     | No     | Yes               | Yes              | Yes          | Yes     | Yes   | No             | No                   | No       | —      | No        | Yes       |
+| `version`            | No        | No     | No     | No     | No     | No                | No               | No           | Yes     | No    | No             | No                   | No       | No     | —         | Yes       |
+| `verbose`            | Yes       | Yes    | No     | Yes    | Yes    | Yes               | Yes              | Yes          | Yes     | Yes   | No             | Yes                  | Yes      | Yes    | Yes       | —         |
 
 #### Example Usage (runtime)
 
@@ -789,24 +862,29 @@ own use cases.
     python mypackage.chub --show-scripts
     ```
 
-24. Install and run baked entrypoint with verbose logs
+24. Show compatible interpreter/AMI/platform targets supported by the `.chub`
+    ```bash
+    python mypackage.chub --show-compatibility
+    ```
+
+25. Install and run baked entrypoint with verbose logs
     ```bash
     python mypackage.chub \
          --run \
          --verbose
     ```
 
-25. Quiet install (minimal output)
+26. Quiet install (minimal output)
     ```bash
     python mypackage.chub --quiet
     ```
 
-26. Show full version info and exit
+27. Show full version info and exit
     ```bash
     python mypackage.chub --version
     ```
 
-27. Help message
+28. Help message
     ```bash
     python mypackage.chub --help
     ```
@@ -851,15 +929,34 @@ other.
 
 ## The `.chubconfig` Metadata File
 
-The `.chubconfig` file is a YAML text file that contains metadata about the
-bundled wheels. It is used by the runtime CLI to determine what to extract,
-and how to handle certain operations. Note that the metadata contains a key
-of `main_wheel` that indicates the main wheel.
+The `.chubconfig` file is a YAML text file created and managed by pychub. It
+tracks metadata about the bundle: what’s included, entrypoints, scripts, and all
+the wheels you will need for any supported installation target.
 
-Here is an example `.chubconfig` file:
+When you build a `.chub`, there will *always* be at least two `.chubconfig`
+files inside. The primary one is called `.chubconfig` and sits at the root of
+the archive. Any additional `.chubconfig` files (one per compatibility target)
+are named after the environment tags they describe—using the exact same tag
+convention as Python wheel files (see PEP 427). For example, you might have a
+chub file with these metadata files:
+
+```
+.chubconfig
+cp310-cp310-manylinux_2_17_x86_64.chubconfig
+cp311-cp311-macosx_11_0_x86_64.chubconfig
+```
+
+If your `.chub` file has universal compatibility, it will have these two
+metadata files:
+
+```
+.chubconfig
+py3-none-any.chubconfig
+```
+
+The **main** `.chubconfig` file summarizes everything about the package:
 
 ```yaml
----
 name: my-app
 version: 1.2.3
 entrypoint: myapp.cli:main
@@ -871,22 +968,41 @@ scripts:
 includes:
   - extra.cfg
   - config.json::conf
-wheels:
-  myapp-1.2.3-py3-none-any.whl:
-    - requests-2.31.0-py3-none-any.whl
-    - requests_toolbelt-0.9.1-py3-none-any.whl
-  mylib-0.4.2-py3-none-any.whl:
-    - somedep-3.2.1-py3-none-any.whl
-    - someotherdep-2.3.4-py3-none-any.whl
-  otherlib-1.26.4-py3-none-any.whl: []
 metadata:
   main_wheel: myapp-1.2.3-py3-none-any.whl
   tags: [http, client]
   maintainer: someone@example.com
 ```
 
-Please be aware that users never have to create or hand-edit this file. It is
-created and maintained by `pychub` itself.
+The **target-specific** `.chubconfig` files are named by their compatibility tag
+and contain just the wheels to install for that tag. For example, if the build
+is universal, you’d see:
+
+```yaml
+wheels:
+  - myapp-1.2.3-py3-none-any.whl
+  - mylib-0.4.2-py3-none-any.whl
+  - otherlib-1.26.4-py3-none-any.whl
+  - requests-2.31.0-py3-none-any.whl
+  - requests_toolbelt-0.9.1-py3-none-any.whl
+  - somedep-3.2.1-py3-none-any.whl
+  - someotherdep-2.3.4-py3-none-any.whl
+```
+
+If your package supports multiple platforms, you will have a separate extension
+`.chubconfig` for each compatibility target (named accordingly). Those files may
+also include universal wheels, since they are compatible with all platforms.
+
+Feel free to verify the supported platforms before you attempt to install the
+bundle. You can do this with the `--show-compatibility` flag.
+
+**You’ll never need to create or hand-edit these files yourself, since `pychub`
+handles all of it for you.** The runtime will pick the right config file based
+on your current interpreter and platform, ensuring you always get the correct
+wheels for your environment. If you attempt to install a `.chub` file on a
+system that is not compatible with any of its supported targets, pychub will
+fail with an error message, rather than creating a mess by attempting to
+install incompatible wheels.
 
 ---
 

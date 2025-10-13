@@ -1,8 +1,12 @@
+# Folders
 .idea
 .venv
-dist
-udir
-vdir
 chub-build
+dist
+htmlcov
+libs
 __pycache__
+
+# Files
 poetry.lock
+.coverage

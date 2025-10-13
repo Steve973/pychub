@@ -6,14 +6,14 @@ from typing import Any
 from pychub.model.chubproject_model import ChubProject
 
 # --- reader: tomllib on 3.11+, tomli on 3.9–3.10 ---
-try:
+try:  # pragma: no cover
     import tomllib  # Python 3.11+
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
 # --- optional writers: pick any one to be installed ---
 _TOML_WRITER = None
-for _name in ("tomli_w", "tomlkit", "toml"):
+for _name in ("tomli_w", "tomlkit", "toml"):  # pragma: no cover
     try:
         _TOML_WRITER = __import__(_name)
         break
@@ -45,7 +45,7 @@ def load_chubproject(path: str | Path) -> ChubProject:
         raise ChubProjectError(f"Failed to parse TOML at {p}") from e
 
     # Let the model handle namespace discovery inside the TOML document
-    proj = ChubProject.from_toml_document(doc)
+    proj = ChubProject.from_toml_document(doc, path.name)
 
     return ChubProject.merge_from_cli_args(
         proj,
@@ -56,6 +56,7 @@ def save_chubproject(
     project: ChubProject | dict,
     path: str | Path = "chubproject.toml",
     *,
+    table_name: str = "tool.pychub.package",
     overwrite: bool = False,
     make_parents: bool = True) -> Path:
     if _TOML_WRITER is None:
@@ -69,9 +70,18 @@ def save_chubproject(
     if isinstance(project, ChubProject):
         obj = project.to_mapping()
     else:
-        # Parse from the mapping to validate, then return to mapping
         obj = ChubProject.from_mapping(project).to_mapping()
-    obj = {"package": {k: v for k, v in obj.items() if v is not None}}
+    obj = {k: v for k, v in obj.items() if v is not None}
+
+    # Nests under a dotted table name
+    def nest_under(table_path: str, value: dict) -> dict:
+        keys = table_path.split(".")
+        d = value
+        for k in reversed(keys):
+            d = {k: d}
+        return d
+
+    obj = nest_under(table_name, obj)
 
     p = Path(path).expanduser().resolve()
     if p.exists() and not overwrite:

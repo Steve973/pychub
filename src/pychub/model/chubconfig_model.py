@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
-from dataclasses import field
 import json
+from dataclasses import field
+from pathlib import Path
+from pickle import compatible_formats
+from typing import Any, Dict, List, Mapping, Optional
+from typing import TYPE_CHECKING
+
 import yaml
 
-from pychub.model.dataclass_shim import dataclass
 from pychub.model.scripts_model import Scripts
+
+if TYPE_CHECKING:
+    from dataclasses import dataclass as dataclass
+else:
+    from .dataclass_shim import dataclass
 
 
 @dataclass(slots=True, frozen=True)
@@ -18,6 +25,7 @@ class ChubConfig:
     wheels: Dict[str, List[str]] = field(default_factory=dict)
     includes: List[str] = field(default_factory=list)
     scripts: Scripts = field(default_factory=Scripts)
+    compatibility: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -31,6 +39,7 @@ class ChubConfig:
         }
         includes = [str(x) for x in (m.get("includes") or [])]
         scripts = Scripts.from_mapping(m.get("scripts"))
+        compatibility = dict(m.get("compatibility") or {})
         metadata = dict(m.get("metadata") or {})
 
         cfg = ChubConfig(
@@ -40,6 +49,7 @@ class ChubConfig:
             wheels=wheels,
             includes=includes,
             scripts=scripts,
+            compatibility=compatibility,
             metadata=metadata)
         cfg.validate()
         return cfg
@@ -65,6 +75,7 @@ class ChubConfig:
             "scripts": self.scripts.to_mapping(),
             "includes": list(self.includes),
             "wheels": {k: list(v) for k, v in self.wheels.items()},
+            "compatibility": dict(self.compatibility),
             "metadata": dict(self.metadata),
         }
 

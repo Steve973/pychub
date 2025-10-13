@@ -28,13 +28,17 @@ def _parse_arg_shapes(commands):
 _REQARG, _OPTARG = _parse_arg_shapes(op.COMMANDS)
 
 # conservative CLI argv builder using map-derived shapes
-def _argv_for(opt):
+def _argv_for(opt, vdir=None, udir=None):
     flag = f"--{opt}"
     if opt in _REQARG:
-        return [flag, "vdir" if opt == "venv" else "value"]
+        if opt == "venv" and vdir:
+            return [flag, str(vdir)]
+        return [flag, "value"]
+    # For optional args like unpack
+    if opt == "unpack" and udir:
+        return [flag, str(udir)]
     # optional args default to omitted value (e.g., --run uses baked entrypoint)
     return [flag]
-
 
 def _incompat_pairs():
     """Unique unordered incompatible pairs, excluding 'help' which argparse handles before our validator."""
@@ -84,28 +88,31 @@ def built_chub(test_env, tmp_path_factory):
     assert_rc_ok(proc)
     return chub
 
-@pytest.fixture(autouse=True)
-def cleanup_named_dirs():
-    yield
-    for d in ("vdir", "udir"):
-        if Path(d).exists():
-            shutil.rmtree(d, ignore_errors=True)
+@pytest.fixture(scope="session")
+def vdir_path(tmp_path_factory):
+    """Session-scoped temp directory for venv operations."""
+    return tmp_path_factory.mktemp("vdir")
+
+@pytest.fixture
+def udir_path(tmp_path):
+    """Function-scoped temp directory for unpack operations."""
+    return tmp_path / "udir"
 
 
 # ------------------------------- tests -------------------------------------
 
 @pytest.mark.integration
 @pytest.mark.parametrize("a,b", _incompat_pairs())
-def test_every_incompatible_pair_fails(built_chub, test_env, a, b):
-    args = _argv_for(a) + _argv_for(b)
+def test_every_incompatible_pair_fails(built_chub, test_env, vdir_path, udir_path, a, b):
+    args = _argv_for(a, vdir_path, udir_path) + _argv_for(b, vdir_path, udir_path)
     proc = run_runtime_cli(built_chub, args, test_env["python_bin"])
     assert_rc_fail(proc)
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("a,b", _compat_pairs())
-def test_sample_compatible_pairs_succeed(built_chub, test_env, a, b):
-    args = _argv_for(a) + _argv_for(b)
+def test_sample_compatible_pairs_succeed(built_chub, test_env, vdir_path, udir_path, a, b):
+    args = _argv_for(a, vdir_path, udir_path) + _argv_for(b, vdir_path, udir_path)
     proc = run_runtime_cli(built_chub, args, test_env["python_bin"])
     assert_rc_ok(proc)
 
@@ -118,11 +125,12 @@ def test_venv_requires_dir_value(built_chub, test_env):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("args", [
+@pytest.mark.parametrize("args_template", [
     ["--unpack"],              # optional DIR missing → ok
-    ["--unpack", "udir"]       # optional DIR provided → ok
+    ["--unpack", "{udir}"]     # optional DIR provided → ok
 ])
-def test_unpack_optional_dir_succeeds(built_chub, test_env, args):
+def test_unpack_optional_dir_succeeds(built_chub, test_env, udir_path, args_template):
+    args = [arg.format(udir=str(udir_path)) if "{udir}" in arg else arg for arg in args_template]
     proc = run_runtime_cli(built_chub, args, test_env["python_bin"])
     assert_rc_ok(proc)
 

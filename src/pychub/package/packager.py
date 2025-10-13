@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
 import sys
 import zipfile
 from email.parser import Parser
-from pathlib import Path, PurePath
+from pathlib import Path
+from pathlib import PurePath
 from typing import Union, List
 
+import yaml
+from packaging.tags import Tag
+from packaging.utils import parse_wheel_filename
+
+from .compatibility import compute_per_combo_wheel_map, enumerate_valid_combos, tag_to_str
 from .constants import (
     CHUB_BUILD_DIR,
     CHUB_LIBS_DIR,
@@ -19,8 +26,11 @@ from .constants import (
     CHUB_PRE_INSTALL_SCRIPTS_DIR,
     CHUB_BUILD_DIR_STRUCTURE,
     CHUB_INCLUDES_DIR)
-from ..model.chubconfig_model import ChubConfig, Scripts
+from .pathdeps.discover import collect_path_dependencies
+from ..helper.stream import Stream
+from ..model.chubconfig_model import ChubConfig
 from ..model.chubproject_model import ChubProject
+from ..model.project_context import ProjectContext
 
 _ALLOWED = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -34,7 +44,7 @@ def _sanitize(p: str | PurePath) -> str:
 
 
 def prefixed_script_names(paths: list[str | Path]) -> list[tuple[Path, str]]:
-    """Return (src_path, dest_name) with zero-padded index prefix.
+    """Return (src_path, dest_name) with a zero-padded index prefix.
     Lexical sort preserves input order; width grows when >=100 items.
     """
     width = max(2, len(str(max(len(paths) - 1, 0))))
@@ -103,6 +113,52 @@ def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
             arcname = file_path.relative_to(chub_build_dir)
             zf.write(file_path, arcname)
     return chub_archive_path
+
+
+def analyze_compatibility(chubproject: ChubProject) -> list[str]:
+    """
+    Given a ChubProject, return a deduplicated list of valid
+    (interpreter-abi-platform) combo strings for which the bundle would
+    be compatible. Used for --analyze-compatibility reporting.
+    """
+    wheel_files, _, _ = resolve_all_dependency_wheels(chubproject, reuse_cache=Path(".wheel_cache"))
+    return (
+        Stream(enumerate_valid_combos(wheel_files))
+        .map(lambda tag: tag_to_str(Tag(tag[0], tag[1], tag[2])))
+        .distinct()
+        .to_list())
+
+
+def write_chubconfig_files(
+        dist_name: str,
+        dist_ver: str,
+        project_context: ProjectContext,
+        per_combo_wheel_map: dict[str, dict[str, str]],
+        chub_build_dir: Path) -> None:
+    chubconfig_model = ChubConfig.from_mapping({
+        "name": dist_name,
+        "version": dist_ver,
+        "entrypoint": project_context.entrypoint,
+        "includes": project_context.includes or [],
+        "scripts": {
+            "pre": [n for _, n in project_context.pre_scripts],
+            "post": [n for _, n in project_context.post_scripts]
+        },
+        "compatibility": {"targets": list(per_combo_wheel_map.keys())},
+        "metadata": project_context.metadata
+    })
+    chubconfig_model.validate()
+    chubconfig_file = Path(chub_build_dir / CHUBCONFIG_FILENAME).resolve()
+    chubconfig_file.write_text(chubconfig_model.to_yaml(), encoding="utf-8")
+
+    (
+        Stream(per_combo_wheel_map.items())
+        .filter(lambda pair: bool(pair[1]))
+        .for_each(
+            lambda pair: Path(chub_build_dir, f"{pair[0]}.chubconfig").write_text(
+                yaml.dump({"wheels": sorted(pair[1].values())}, indent=2),
+                encoding="utf-8"))
+    )
 
 
 def copy_runtime_files(chub_build_dir: Path) -> None:
@@ -181,32 +237,29 @@ def download_wheel_deps(
     wheel_path: str | Path,
     dest: str | Path,
     only_binary: bool = True,
-    extra_pip_args: list[str] | None = None) -> list[str]:
-    """Resolve and download the wheel and all its dependencies into dest."""
+    extra_pip_args: list[str] | None = None,
+    find_links: Path | None = None,
+    no_index: bool = False,) -> list[str]:
     wheel_path = str(Path(wheel_path).resolve())
     dest = Path(dest).resolve()
     dest.mkdir(parents=True, exist_ok=True)
-    before = set(Path(dest).glob("*.whl")) or []
+    before = set(dest.glob("*.whl"))
 
-    cmd = [
-        sys.executable,
-        "-m",
-        "pip",
-        "download",
-        wheel_path,
-        "--dest",
-        str(dest)
-    ]
+    cmd = [sys.executable, "-m", "pip", "download", wheel_path, "--dest", str(dest)]
     if only_binary:
         cmd += ["--only-binary", ":all:"]
+    if find_links:
+        cmd += ["--find-links", str(find_links)]
+    if no_index:
+        cmd += ["--no-index"]
     if extra_pip_args:
         cmd += list(extra_pip_args)
 
     result = subprocess.run(cmd, text=True, capture_output=True)
     if result.returncode != 0:
         raise RuntimeError(f"pip download failed:\n{result.stderr}")
-    after = set(dest.glob("*.whl")) or []
-    return sorted(f.name for f in set(after) - set(before)) or []
+    after = set(dest.glob("*.whl"))
+    return sorted(f.name for f in (after - before))
 
 
 def get_wheel_metadata(wheel_path: str | Path,
@@ -232,8 +285,45 @@ def get_wheel_metadata(wheel_path: str | Path,
     return name, version
 
 
-def get_chub_name(package_name: str, version: str) -> str:
-    return "-".join([package_name, version])
+def resolve_wheel_recursive(
+    wheel_path: Path,
+    libs_dir: Path,
+    cache_dir: Path,
+    mode: str = "cache-first",  # or "pypi-only"
+    seen: set[tuple[str, str]] | None = None) -> None:
+    if seen is None:
+        seen = set()
+
+    name, version = get_wheel_metadata(wheel_path)
+    key = (name, version)
+    if key in seen:
+        return
+    seen.add(key)
+
+    # 1) Try local-only first when in cache-first mode
+    touched_pypi = False
+    try:
+        if mode == "cache-first":
+            new_files = download_wheel_deps(
+                wheel_path, libs_dir, find_links=cache_dir, no_index=True)
+        else:
+            new_files = download_wheel_deps(wheel_path, libs_dir)
+    except RuntimeError:
+        # Local-only failed => flip this branch to PyPI
+        touched_pypi = True
+        new_files = download_wheel_deps(wheel_path, libs_dir)
+
+    # 2) Recurse into newly downloaded deps
+    for fname in new_files:
+        dep_path = libs_dir / fname
+        dep_name, dep_version = get_wheel_metadata(dep_path)
+        dep_key = (dep_name, dep_version)
+        if dep_key in seen:
+            continue
+
+        # once we’ve touched PyPI in this branch, stay PyPI-only downstream
+        next_mode = "pypi-only" if (touched_pypi or mode == "pypi-only") else "cache-first"
+        resolve_wheel_recursive(dep_path, libs_dir, cache_dir, next_mode, seen)
 
 
 def create_chub_build_dir(wheel_path: str | Path,
@@ -258,8 +348,7 @@ def verify_pip() -> None:
     code = subprocess.call([sys.executable, "-m", "pip", "--version"])  # noqa: S603
     if code != 0:
         raise RuntimeError(
-            "pip not found. Ensure 'python -m pip' works in this environment."
-        )
+            "pip not found. Ensure 'python -m pip' works in this environment.")
 
 
 def validate_files_exist(files: list[str] | [], context: str) -> None:
@@ -312,17 +401,14 @@ def absolutize_paths(paths: Union[str, List[str]], base_dir: Path) -> Union[str,
 
     return resolved[0] if is_single else resolved
 
-def build_chub(chubproject: ChubProject) -> Path:
-    verify_pip()
 
+def prepare_project(chubproject: ChubProject) -> ProjectContext:
     entrypoint = chubproject.entrypoint
     metadata = chubproject.metadata or {}
-
     project_dir = (
         Path(metadata["__file__"]).parent.resolve()
         if "__file__" in metadata
         else Path(".").resolve())
-
     wheel_paths: list[Path] = []
     if chubproject.wheel:
         wheel_paths.append(Path(chubproject.wheel).expanduser().resolve())
@@ -331,9 +417,8 @@ def build_chub(chubproject: ChubProject) -> Path:
     post_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.post, project_dir)) if chubproject.scripts.post else []
     pre_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.pre, project_dir)) if chubproject.scripts.pre else []
 
-    includes_raw = chubproject.includes or []
     included_files = []
-    for inc_mod in includes_raw:
+    for inc_mod in (chubproject.includes or []):
         inc = inc_mod.as_string()
         if "::" in inc:
             src, dest = inc.split("::", 1)
@@ -341,57 +426,120 @@ def build_chub(chubproject: ChubProject) -> Path:
         else:
             included_files.append(f"{absolutize_paths(inc, project_dir)}")
 
-    chub_path = chubproject.chub
+    return ProjectContext(project_dir=project_dir,
+                          entrypoint=entrypoint,
+                          metadata=metadata,
+                          wheel_paths=wheel_paths,
+                          post_scripts=post_install_scripts,
+                          pre_scripts=pre_install_scripts,
+                          includes=included_files)
 
-    if not wheel_paths:
+
+def prepare_build_dirs(main_wheel_path: Path, chub_path: Path | None) -> tuple[Path, Path, Path]:
+    chub_build_dir = create_chub_build_dir(main_wheel_path, chub_path)
+    wheel_libs_dir = chub_build_dir / CHUB_LIBS_DIR
+    wheel_libs_dir.mkdir(parents=True, exist_ok=True)
+    path_cache_dir = chub_build_dir / ".wheel_cache"
+    path_cache_dir.mkdir(parents=True, exist_ok=True)
+    return chub_build_dir, wheel_libs_dir, path_cache_dir
+
+
+def stage_path_dependencies(project_dir: Path, cache_dir: Path) -> None:
+    path_projects = collect_path_dependencies(project_dir / "pyproject.toml")
+    for proj_root, strategy in path_projects.items():
+        dist_dir = proj_root / "dist"
+        if not dist_dir.exists():
+            raise FileNotFoundError(f"[{strategy}] {proj_root} has no dist/ directory")
+        wheels = list(dist_dir.glob("*.whl"))
+        if not wheels:
+            raise FileNotFoundError(f"[{strategy}] {proj_root} has no wheel in dist/")
+        for w in wheels:
+            shutil.copy2(w, cache_dir / w.name)
+
+
+def resolve_wheels(
+    wheel_paths: list[Path],
+    libs_dir: Path,
+    cache_dir: Path) -> dict[str, list[str]]:
+    seen: set[tuple[str, str]] = set()
+    wheels_map: dict[str, list[str]] = {}
+    for wp in wheel_paths:
+        shutil.copy2(wp, libs_dir / wp.name)
+        resolve_wheel_recursive(wp, libs_dir, cache_dir, "cache-first", seen)
+        wheels_map[wp.name] = [f for f in os.listdir(libs_dir) if f.endswith(".whl")]
+    return wheels_map
+
+
+def resolve_all_dependency_wheels(
+    chubproject: ChubProject,
+    reuse_cache: Path | None = None) -> tuple[dict[str, list[str]], Path, ProjectContext]:
+    """
+    Resolves all dependency wheels for a ChubProject, handling path deps.
+    Returns (wheel_files mapping, cache_dir used, and the ProjectContext).
+    """
+    project_context = prepare_project(chubproject)
+    if not project_context.wheel_paths:
         raise ValueError("No wheels provided")
 
-    main_wheel_name = str(metadata.get("main_wheel", Path(wheel_paths[0]).name))
-    main_wheel_path = next((p for p in wheel_paths if p.name == main_wheel_name), wheel_paths[0])
+    # Use a real or temp cache dir
+    if reuse_cache:
+        path_cache_dir = Path(reuse_cache).resolve()
+        path_cache_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        import tempfile
+        path_cache_dir = Path(tempfile.mkdtemp())
 
-    chub_build_dir = create_chub_build_dir(main_wheel_path, chub_path)
+    # Stage path deps (for local wheel resolution)
+    stage_path_dependencies(project_context.project_dir, path_cache_dir)
 
-    package_name, version = get_wheel_metadata(main_wheel_path)
-    chub_name = get_chub_name(package_name, version)
+    # Download/resolve all wheels
+    wheel_files = resolve_wheels(
+        project_context.wheel_paths,
+        path_cache_dir,  # use as libs_dir for analysis
+        path_cache_dir)
+
+    return wheel_files, path_cache_dir, project_context
+
+
+def build_chub(chubproject: ChubProject) -> Path:
+    verify_pip()
+
+    # Use the new utility to resolve all wheels (and get build context)
+    wheel_files, path_cache_dir, project_context = resolve_all_dependency_wheels(chubproject, reuse_cache=None)
+
+    # Create the build dirs as before
+    main_wheel_name = str(project_context.metadata.get("main_wheel", Path(project_context.wheel_paths[0]).name))
+    main_wheel_path = next(
+        (p for p in project_context.wheel_paths if p.name == main_wheel_name),
+        project_context.wheel_paths[0])
+    chub_build_dir, wheel_libs_dir, _ = prepare_build_dirs(main_wheel_path, chubproject.chub)
 
     validate_chub_structure(
         chub_build_dir,
-        [str(path) for path, _ in (post_install_scripts or [])],
-        [str(path) for path, _ in (pre_install_scripts  or [])],
-        included_files)
+        [str(p) for p, _ in project_context.post_scripts],
+        [str(p) for p, _ in project_context.pre_scripts],
+        project_context.includes)
 
-    wheel_libs_dir = chub_build_dir / CHUB_LIBS_DIR
-    wheels_map: dict[str, list[str]] = {}
-    for wp in wheel_paths:
-        shutil.copy2(wp, wheel_libs_dir / wp.name)
-        wheels_map[wp.name] = download_wheel_deps(wp, wheel_libs_dir)
+    (
+        Stream(wheel_files.values())
+        .flat_map(lambda ws: ws)
+        .for_each(lambda wheel_name: (
+            shutil.copy2(path_cache_dir / wheel_name, wheel_libs_dir / wheel_name)
+            if not (wheel_libs_dir / wheel_name).exists() else None))
+    )
 
+    stage_path_dependencies(project_context.project_dir, path_cache_dir)
+    wheels_map = resolve_wheels(project_context.wheel_paths, wheel_libs_dir, path_cache_dir)
+    per_combo_wheel_map = compute_per_combo_wheel_map(wheels_map)
+    dist_name, dist_ver, *_ = parse_wheel_filename(main_wheel_name)
+    dist_name, dist_ver = chubproject.name or dist_name, chubproject.version or dist_ver
     script_base = chub_build_dir / CHUB_SCRIPTS_DIR
-    copy_install_scripts(script_base, post_install_scripts, CHUB_POST_INSTALL_SCRIPTS_DIR)
-    copy_install_scripts(script_base, pre_install_scripts,  CHUB_PRE_INSTALL_SCRIPTS_DIR)
-    copy_included_files(chub_build_dir, included_files)
+    copy_install_scripts(script_base, project_context.post_scripts, CHUB_POST_INSTALL_SCRIPTS_DIR)
+    copy_install_scripts(script_base, project_context.pre_scripts,  CHUB_PRE_INSTALL_SCRIPTS_DIR)
+    copy_included_files(chub_build_dir, project_context.includes)
     copy_runtime_files(chub_build_dir)
-
-    chubconfig_model = ChubConfig.from_mapping({
-        "name": package_name,
-        "version": version,
-        "entrypoint": entrypoint,
-        "wheels": wheels_map,
-        "includes": included_files or [],
-        "scripts": {
-            "pre":  [name for _, name in (pre_install_scripts  or [])],
-            "post": [name for _, name in (post_install_scripts or [])],
-        },
-        "metadata": metadata
-    })
-    chubconfig_model.validate()
-    chubconfig_file = Path(chub_build_dir / CHUBCONFIG_FILENAME).resolve()
-    with chubconfig_file.open("w+", encoding="utf-8") as f:
-        f.write(chubconfig_model.to_yaml())
-
-    if chub_path is None:
-        chub_path = chub_build_dir / f"{chub_name}.chub"
-
+    write_chubconfig_files(dist_name, dist_ver, project_context, per_combo_wheel_map, chub_build_dir)
+    chub_path = chubproject.chub or (chub_build_dir / f"{dist_name}-{dist_ver}.chub")
     output_path = create_chub_archive(chub_build_dir, Path(chub_path))
     print(f"Built {output_path}")
     return output_path
