@@ -71,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("-u", "--unpack",
                    nargs="?",
-                   const="",
+                   const=".",
                    metavar="DIR",
                    help=(
                        "Extract .chubconfig and all wheel-related files; if "

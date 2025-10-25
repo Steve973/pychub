@@ -1,12 +1,43 @@
 from __future__ import annotations
 
 import glob
+import json
 import os
+import re
+import zipfile
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING
 
-from pychub.model.chubconfig_model import dataclass
+import yaml
+
 from pychub.model.includes_model import IncludeSpec
 from pychub.model.scripts_model import Scripts
+
+if TYPE_CHECKING:
+    from dataclasses import dataclass as dataclass
+else:
+    from .dataclass_shim import dataclass
+
+# --- reader: tomllib on 3.11+, tomli on 3.9–3.10 ---
+try:  # pragma: no cover
+    # noinspection PyCompatibility
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
+
+# --- optional writers: pick any one to be installed ---
+_TOML_WRITER = None
+for _name in ("tomli_w", "tomlkit", "toml"):  # pragma: no cover
+    try:
+        _TOML_WRITER = __import__(_name)
+        break
+    except ModuleNotFoundError:
+        pass
+
+
+class ChubProjectError(Exception):
+    pass
 
 
 def resolve_wheels(mw: str | None = None, aw: list[str] | None = None) -> tuple[str | None, list[str]]:
@@ -17,6 +48,27 @@ def resolve_wheels(mw: str | None = None, aw: list[str] | None = None) -> tuple[
     files = sorted(glob.glob(os.path.join(cwd, "dist", "*.whl")))
     main_wheel, *additional_wheels = files
     return main_wheel, additional_wheels
+
+
+def get_wheel_name_version(wheel_path: Path) -> tuple[str, str]:
+    if wheel_path is None:
+        raise ValueError("Cannot get wheel name and version: no wheel path provided")
+    with zipfile.ZipFile(wheel_path) as zf:
+        metadata_file = next((f for f in zf.namelist() if f.endswith('METADATA')), None)
+        if metadata_file is None:
+            raise ValueError("No METADATA file found in wheel")
+
+        with zf.open(metadata_file) as f:
+            for line in f:
+                decoded = line.decode('utf-8')
+                if decoded.startswith("Name: "):
+                    name = decoded.split("Name: ", 1)[1].strip()
+                elif decoded.startswith("Version: "):
+                    version = decoded.split("Version: ", 1)[1].strip()
+                if 'name' in locals() and 'version' in locals():
+                    return name, version
+
+    raise ValueError("Name and Version not found in wheel METADATA")
 
 
 @dataclass(slots=True)
@@ -54,15 +106,14 @@ class ChubProject:
             scripts=Scripts.from_mapping(m.get("scripts")))
 
     @staticmethod
-    def from_toml_document(doc: Mapping[str, Any]) -> "ChubProject":
+    def from_toml_document(doc: Mapping[str, Any], toml_name: str = None) -> "ChubProject":
         """
         Load with flexible namespacing:
-          1) [package]
-          2) [pychub.package]
-          3) any table whose dotted path endswith ".pychub.package"
-          4) if exactly one table looks package-like, use it; otherwise error
+          1) [tool.pychub.package] if pyproject.toml
+          2) [tool.pychub.package] or [pychub.package] or [package] if chubproject.toml
+          3) the entire document if the previous namespace is not found, and is chubproject.toml
         """
-        tbl = ChubProject._select_package_table(doc)
+        tbl = ChubProject._select_package_table(doc, toml_name)
         return ChubProject.from_mapping(tbl)
 
     @staticmethod
@@ -208,53 +259,144 @@ class ChubProject:
     # ------------------- namespacing helpers -------------------
 
     @staticmethod
-    def _select_package_table(doc: Mapping[str, Any]) -> Mapping[str, Any]:
-        # 1) exact [package]
-        pkg = doc.get("package")
-        if isinstance(pkg, Mapping):
-            return pkg
-
-        # 2) scan for pychub.package or any *.pychub.package
-        candidates: List[Tuple[int, str, Mapping[str, Any]]] = []
-        for path, tbl in ChubProject._walk_tables("", doc):
-            if path == "pychub.package":
-                candidates.append((0, path, tbl))
-            elif path.endswith(".pychub.package"):
-                candidates.append((1, path, tbl))
-
-        if candidates:
-            candidates.sort(key=lambda t: t[0])
-            best_score = candidates[0][0]
-            best = [c for c in candidates if c[0] == best_score]
-            if len(best) > 1:
-                opts = ", ".join(p for _, p, _ in best)
-                raise ValueError(f"Ambiguous config tables: {opts}. Choose and use only one.")
-            return best[0][2]
-
-        # 3) last resort: unique package-like table
-        lookalikes = [(p, t) for p, t in ChubProject._walk_tables("", doc) if ChubProject._looks_like_pkg_table(t)]
-        if len(lookalikes) == 1:
-            return lookalikes[0][1]
-        if not lookalikes:
-            raise ValueError(
-                "No package-like table found. Provide [package], [pychub.package], "
-                "a table ending with .pychub.package, or use a flattened config."
-            )
-        paths = ", ".join(p for p, _ in lookalikes)
-        raise ValueError(f"Multiple package-like tables found: {paths}. Choose and use only one.")
+    def _select_package_table(doc: Mapping[str, Any], toml_name: str = None) -> Mapping[str, Any] | None:
+        # 1) if pyproject.toml, exact [tool.pychub.package] in pyproject.toml
+        if toml_name == "pyproject.toml":
+            pkg = doc.get("tool", {}).get("pychub", {}).get("package")
+            if isinstance(pkg, Mapping):
+                if pkg.get("enabled") is False:
+                    print("WARNING: [tool.pychub.package.enabled] is False -- skipping pychub packaging")
+                    return None
+                else:
+                    print("INFO: [tool.pychub.package] is enabled -- using pychub packaging")
+                    return pkg
+            else:
+                print("WARNING: [tool.pychub.package] not found in pyproject.toml -- skipping pychub packaging")
+                return None
+        # 2) exact [tool.pychub.package] [pychub.package] or [package] in chubproject.toml
+        elif re.fullmatch(r".*chubproject.*\.toml", toml_name):
+            pkg = doc.get("tool", doc).get("pychub", doc).get("package")
+            if isinstance(pkg, Mapping):
+                print(f"INFO: [pychub.package] is enabled in {toml_name} -- using pychub packaging")
+                return pkg
+            else:
+                # 3) flat table in chubproject.toml
+                print(f"INFO: flat table found in {toml_name} -- using pychub packaging")
+                return doc
+        else:
+            print(f"WARNING: unrecognized document detected: {toml_name} -- skipping pychub packaging")
+            return None
 
     @staticmethod
-    def _walk_tables(prefix: str, tbl: Mapping[str, Any]):
-        yield prefix, tbl
-        for k, v in tbl.items():
-            if isinstance(v, Mapping):
-                sub = f"{prefix}.{k}" if prefix else str(k)
-                yield from ChubProject._walk_tables(sub, v)
+    def determine_table_path(chubproject_path: Path, table_arg: str | None) -> str | None:
+        """
+        Determine the effective table path to use for loading the config.
+
+        - If the filename is pyproject.toml → always return 'tool.pychub.package'
+        - If table_arg is None → always return 'tool.pychub.package' (it is the default)
+        - If table_arg == 'flat' → return None (flat table)
+        - Else → return the dotted path (e.g., 'pychub.package', 'package')
+        """
+        default_table = "tool.pychub.package"
+
+        if chubproject_path.name == "pyproject.toml":
+            return default_table
+
+        if not re.fullmatch(r"(.*[-_.])?chubproject([-_.].*)?\.toml", chubproject_path.name):
+            raise ValueError(f"Invalid chubproject_path: {chubproject_path!r}")
+
+        if table_arg is None:
+            return default_table
+
+        normalized_name = table_arg.strip().lower()
+
+        if normalized_name == "flat":
+            return None
+
+        if re.fullmatch(r"^(tool\.)?(pychub\.)?package$", normalized_name):
+            return normalized_name
+
+        raise ValueError(f"Invalid table_arg: {table_arg!r}")
 
     @staticmethod
-    def _looks_like_pkg_table(tbl: Mapping[str, Any]) -> bool:
-        anchors = ("wheel", "add_wheels", "entrypoint", "includes", "include", "scripts", "metadata", "chub")
-        return any(k in tbl for k in anchors)
+    def load_file(path: str | Path) -> ChubProject:
+        """
+        Load a chubproject TOML file from disk.
+
+        - PATH is the filesystem path to the TOML file (e.g., passed via --chubproject PATH).
+        - Supports flexible namespacing inside the file via ChubProject.from_toml_document:
+            [package], [pychub.package], or any table ending with ".pychub.package".
+        - After parsing, records the file's absolute path under metadata["__file__"].
+        """
+        p = Path(path).expanduser().resolve()
+        if not p.is_file():
+            raise ChubProjectError(f"Project file not found: {p}")
+
+        try:
+            with p.open("rb") as f:
+                doc = tomllib.load(f)
+        except Exception as e:
+            raise ChubProjectError(f"Failed to parse TOML at {p}") from e
+
+        # Let the model handle namespace discovery inside the TOML document
+        proj = ChubProject.from_toml_document(doc, path.name)
+
+        return ChubProject.merge_from_cli_args(
+            proj,
+            {"metadata_entry": [f"__file__={p.as_posix()}"]})
+
+    @staticmethod
+    def save_file(
+            project: ChubProject | dict,
+            path: str | Path = "chubproject.toml",
+            *,
+            table_name: str = "tool.pychub.package",
+            overwrite: bool = False,
+            make_parents: bool = True) -> Path:
+        if _TOML_WRITER is None:
+            raise ChubProjectError(
+                "Saving requires a TOML writer. Install one of:\n"
+                "  pip install tomli-w   # preferred\n"
+                "  pip install tomlkit   # also works\n"
+                "  pip install toml      # legacy")
+
+        # accept either a ChubProject or a raw mapping
+        if isinstance(project, ChubProject):
+            obj = project.to_mapping()
+        else:
+            obj = ChubProject.from_mapping(project).to_mapping()
+        obj = {k: v for k, v in obj.items() if v is not None}
+
+        # Nests under a dotted table name
+        def nest_under(table_path: str, value: dict) -> dict:
+            keys = table_path.split(".")
+            d = value
+            for k in reversed(keys):
+                d = {k: d}
+            return d
+
+        obj = nest_under(table_name, obj)
+
+        p = Path(path).expanduser().resolve()
+        if p.exists() and not overwrite:
+            raise ChubProjectError(f"Refusing to overwrite without overwrite=True: {p}")
+        if make_parents:
+            p.parent.mkdir(parents=True, exist_ok=True)
+
+        def _coerce(x: Any):
+            if isinstance(x, Path):
+                return x.as_posix()
+            if isinstance(x, dict):
+                return {str(k): _coerce(v) for k, v in x.items()}
+            if isinstance(x, (list, tuple)):
+                return [_coerce(v) for v in x]
+            if isinstance(x, set):
+                return sorted(_coerce(v) for v in x)
+            return x
+
+        text = _TOML_WRITER.dumps(_coerce(obj))  # type: ignore[attr-defined]
+        p.write_text(text, encoding="utf-8")
+        return p
 
     # ------------------- small utils -------------------
 
@@ -292,7 +434,8 @@ class ChubProject:
         seen, out = set(), []
         for s in items:
             if s not in seen:
-                seen.add(s); out.append(s)
+                seen.add(s)
+                out.append(s)
         return out
 
     @staticmethod
@@ -303,7 +446,8 @@ class ChubProject:
         for spec in [*(a or []), *(b or [])]:
             key = (spec.src, spec.dest)
             if key not in seen:
-                seen.add(key); out.append(spec)
+                seen.add(key)
+                out.append(spec)
         return out
 
     # ------------------- instance methods -------------------
@@ -321,3 +465,11 @@ class ChubProject:
             "metadata": dict(self.metadata or {}),
             "scripts": self.scripts.to_mapping() if self.scripts else {"pre": [], "post": []},
         }
+
+    def to_json(self, *, indent: int = 2) -> str:
+        return json.dumps(self.to_mapping(), sort_keys=True, ensure_ascii=False, indent=indent)
+
+    def to_yaml(self, *, indent: int = 2) -> str:
+        if yaml is None:
+            raise RuntimeError("PyYAML not installed")
+        return yaml.safe_dump(self.to_mapping(), sort_keys=True, indent=indent, allow_unicode=True)

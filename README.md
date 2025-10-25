@@ -2,7 +2,7 @@
 
 Welcome to **pychub**! This README is a quick overview of the project. It is
 meant to give you the fastest possible overview. For more details, see the
-very comprehensive [USER_GUIDE](USER_GUIDE.md).
+very comprehensive [USER_GUIDE](docs/USER_GUIDE.md).
 
 ## Overview
 
@@ -79,7 +79,7 @@ a plugin for it!
 ## Learn more
 
 For a full walkthrough with CLI options, examples, comparison tables, and
-roadmap, see the [USER_GUIDE](USER_GUIDE.md).
+roadmap, see the [USER_GUIDE](docs/USER_GUIDE.md).
 
 ---
 

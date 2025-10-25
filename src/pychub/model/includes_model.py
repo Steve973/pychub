@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional
+from typing import TYPE_CHECKING
 
-from pychub.model.chubconfig_model import dataclass
+if TYPE_CHECKING:
+    from dataclasses import dataclass as dataclass
+else:
+    from .dataclass_shim import dataclass
 
 
 @dataclass(slots=True)

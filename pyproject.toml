@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "pychub"
-version = "1.1.1"
+version = "2.0.0"
 description = "Make a Python-native .chub installer from wheels and their dependencies."
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
@@ -44,7 +44,21 @@ keywords = [
 
 [project.urls]
 Homepage = "https://github.com/Steve973/pychub"
+Documentation = "https://github.com/Steve973/pychub/blob/main/docs/USER_GUIDE.md"
+Changelog = "https://github.com/Steve973/pychub/blob/main/docs/CHANGELOG.md"
+ReleaseNotes = "https://github.com/Steve973/pychub/blob/main/docs/RELEASE_NOTES.md"
+Contributing = "https://github.com/Steve973/pychub/blob/main/docs/DEV_AND_CONTRIB.md"
 Source = "https://github.com/Steve973/pychub/tree/main"
+
+# Plugin links
+PoetryPlugin = "https://github.com/Steve973/pychub-build-plugins/tree/main/poetry"
+PoetryPluginPyPI = "https://pypi.org/project/pychub-poetry-plugin/"
+
+HatchPlugin = "https://github.com/Steve973/pychub-build-plugins/tree/main/hatch"
+HatchPluginPyPI = "https://pypi.org/project/pychub-hatch-plugin/"
+
+PDMPlugin = "https://github.com/Steve973/pychub-build-plugins/tree/main/pdm"
+PDMPluginPyPI = "https://pypi.org/project/pychub-pdm-plugin/"
 
 [project.scripts]
 pychub = "pychub.package.cli:main"
@@ -53,13 +67,20 @@ pychub = "pychub.package.cli:main"
 packages = [{ include = "pychub", from = "src" }]
 
 [tool.poetry.dependencies]
-pyyaml = ">=6.0.3"
+appdirs = ">=1.4.4"
 attrs = ">=25.3.0"
+cyclonedx-python-lib = ">=11.2.0"
+packaging = ">=25.0"
+pyyaml = ">=6.0.3"
+requests = ">=2.32.5"
+reuse = ">=6.1.2"
+spdx-tools = ">=0.8.3"
 tomli = { version = ">=2.2", markers = "python_version < '3.11'" }
 tomli-w = ">=1.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.4.1"
+pytest-cov = ">=7.0.0"
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "-q", "--import-mode=importlib"]

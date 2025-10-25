@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
-from dataclasses import field
 import json
+from dataclasses import field
+from pathlib import Path
+from pickle import compatible_formats
+from typing import Any, Dict, List, Mapping, Optional
+from typing import TYPE_CHECKING
+
 import yaml
 
-from pychub.model.dataclass_shim import dataclass
 from pychub.model.scripts_model import Scripts
+
+if TYPE_CHECKING:
+    from dataclasses import dataclass as dataclass
+else:
+    from .dataclass_shim import dataclass
 
 
 @dataclass(slots=True, frozen=True)

@@ -19,7 +19,8 @@ from .constants import (
     CHUB_PRE_INSTALL_SCRIPTS_DIR,
     CHUB_BUILD_DIR_STRUCTURE,
     CHUB_INCLUDES_DIR)
-from ..model.chubconfig_model import ChubConfig, Scripts
+from .pathdeps.discover import collect_path_dependencies
+from ..model.chubconfig_model import ChubConfig
 from ..model.chubproject_model import ChubProject
 
 _ALLOWED = re.compile(r"[^A-Za-z0-9._-]+")
@@ -297,6 +298,19 @@ def validate_chub_structure(chub_build_dir: Path,
         validate_files_exist(scripts, context=f"{script_type}-install")
 
 
+def stage_path_dependencies(project_dir: Path, cache_dir: Path) -> None:
+    path_projects = collect_path_dependencies(project_dir / "pyproject.toml")
+    for proj_root, strategy in path_projects.items():
+        dist_dir = proj_root / "dist"
+        if not dist_dir.exists():
+            raise FileNotFoundError(f"[{strategy}] {proj_root} has no dist/ directory")
+        wheels = list(dist_dir.glob("*.whl"))
+        if not wheels:
+            raise FileNotFoundError(f"[{strategy}] {proj_root} has no wheel in dist/")
+        for w in wheels:
+            shutil.copy2(w, cache_dir / w.name)
+
+
 def absolutize_paths(paths: Union[str, List[str]], base_dir: Path) -> Union[str, List[str]]:
     """
     Ensures that each path is absolute. If a path is not absolute, it is joined with base_dir.
@@ -311,6 +325,7 @@ def absolutize_paths(paths: Union[str, List[str]], base_dir: Path) -> Union[str,
     ]
 
     return resolved[0] if is_single else resolved
+
 
 def build_chub(chubproject: ChubProject) -> Path:
     verify_pip()

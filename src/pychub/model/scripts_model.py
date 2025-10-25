@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from dataclasses import field
 from typing import Any, Dict, List, Mapping
+from typing import TYPE_CHECKING
 
-from pychub.model.chubconfig_model import dataclass
+if TYPE_CHECKING:
+    from dataclasses import dataclass as dataclass
+else:
+    from .dataclass_shim import dataclass
 
 
 @dataclass(slots=True, frozen=True)

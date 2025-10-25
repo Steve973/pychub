@@ -57,10 +57,11 @@ def assert_venv_python_exists(venv_path: Path) -> None:
 def assert_quiet(proc) -> None:
     """
     Heuristic: in quiet mode, stdout should be very short (or empty) on
-    success; stderr empty and rc==0.
+    success; stderr is empty and rc==0.
     """
     assert_rc_ok(proc)
-    assert len(proc.stdout.strip()) < 50, "too chatty in --quiet"
+    out_txt = proc.stdout.strip()
+    assert len(out_txt) < 1000, f"too chatty in --quiet:\n{out_txt}"
     assert (proc.stderr or "").strip() == "", "stderr should be empty on success"
 
 

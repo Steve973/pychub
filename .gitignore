@@ -1,8 +1,12 @@
 .idea
 .venv
 dist
+htmlcov
+libs
 udir
 vdir
+.chubconfig
+.coverage
 chub-build
 __pycache__
 poetry.lock

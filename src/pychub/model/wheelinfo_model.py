@@ -8,8 +8,12 @@ from dataclasses import field
 from email.parser import Parser
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING
 
-from pychub.model.dataclass_shim import dataclass
+if TYPE_CHECKING:
+    from dataclasses import dataclass as dataclass
+else:
+    from .dataclass_shim import dataclass
 
 # --------------------------------------------------------------------------
 # Selectors (case-insensitive). Use "A|B" to mean "prefer A, else B".

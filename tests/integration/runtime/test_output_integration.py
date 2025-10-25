@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import pytest
 
 from tests.integration._asserts import (
@@ -10,7 +13,6 @@ from tests.integration._factories import (
     mk_chub_with_entrypoint,
 )
 from tests.integration.conftest import run_runtime_cli
-
 
 # Compact but representative flag matrices for info actions.
 # These flags are compatible with --list/--version/--help and allow us to
@@ -27,19 +29,25 @@ FLAG_SETS = [
 def test_list_shows_bundled_wheels(test_env, tmp_path, flags):
     chub = mk_chub_basic(tmp_path, test_env)
 
+    print("cwd:", os.getcwd())
+    print("contents:", list(Path('.').glob('*')))
+    print("test_env:", test_env)
+    print("looking for .chubconfig at:", Path('.') / '.chubconfig')
+    print("chub:", chub)
     proc = run_runtime_cli(chub, [*flags, "--list"], test_env["python_bin"])
+    # [print(p.resolve()) for p in tmp_path.rglob('*') if p.is_file()]
     assert_rc_ok(proc)
     assert_in_stdout(proc, "test_pkg")
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("flags", FLAG_SETS)
-def test_version_prints_python_and_pychubby(test_env, tmp_path, flags):
+def test_version_prints_python_and_pychub(test_env, tmp_path, flags):
     chub = mk_chub_with_entrypoint(tmp_path, test_env)
 
     proc = run_runtime_cli(chub, [*flags, "--version"], test_env["python_bin"])
     assert_rc_ok(proc)
-    # Keep expectations loose; exact version string is environment-specific
+    # Keep expectations loose; the exact version string is environment-specific
     assert_in_stdout(proc, "python", "pychub")
 
 

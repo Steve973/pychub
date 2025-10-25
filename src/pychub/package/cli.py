@@ -13,6 +13,7 @@ def main():
 
     parser.add_argument(
         "wheel",
+        nargs="?",
         type=Path,
         help="Path to the .whl file")
 
@@ -77,6 +78,12 @@ def main():
         help="Pre-install scripts to include and run")
 
     parser.add_argument(
+        "-t",
+        "--table",
+        type=str,
+        help="optional table to use for options config (defaults to 'tool.pychub.package')")
+
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Set output to verbose")
@@ -90,5 +97,5 @@ def main():
     process_options(parser.parse_args())
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
