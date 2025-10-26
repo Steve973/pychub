@@ -1,10 +1,12 @@
 import json
+import sys
 from unittest import mock
 
 import pytest
 import yaml
 
 from pychub.model.chubconfig_model import ChubConfig
+from pychub.model.chubproject_model import ChubProject
 from pychub.model.scripts_model import Scripts
 
 
@@ -752,8 +754,12 @@ def test_config_is_frozen():
 
 
 def test_config_has_slots():
-    """Test that ChubConfig uses slots for memory efficiency."""
-    config = ChubConfig(name="test", version="1.0.0")
+    """Validate that ChubProject has __slots__ defined (3.10+: no __dict__)."""
+    config = ChubProject()
 
-    # Objects with __slots__ don't have __dict__
-    assert not hasattr(config, "__dict__")
+    cls = type(config)
+    assert hasattr(cls, "__slots__"), "ChubProject is missing __slots__"
+
+    # Only check __dict__ absence in Python 3.10+
+    if sys.version_info >= (3, 10):
+        assert not hasattr(config, "__dict__"), "ChubProject unexpectedly has __dict__"
