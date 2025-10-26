@@ -41,6 +41,12 @@ def test_env():
         check=True,
     )
 
+    subprocess.run(
+        [str(python_bin), "-m", "poetry", "build"],
+        cwd=root_dir,  # this is the pychub project root
+        check=True,
+    )
+
     # build the test package using poetry from this venv
     subprocess.run(
         [str(python_bin), "-m", "poetry", "build"],
@@ -75,18 +81,13 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     if chub_build_dir.exists():
         shutil.rmtree(chub_build_dir)
 
-    args = [
-        str(test_env["python_bin"]),
-        "-m",
-        "pychub.package.cli",
-        str(wheel_path),
-        "--chub",
-        str(chub_out),
-    ]
+    args = [str(test_env["python_bin"]), "-m", "pychub.package.cli"]
 
     chubproject = kwargs.get("chubproject")
     if chubproject:
         args += ["--chubproject", chubproject]
+    else:
+        args += [str(wheel_path)]
 
     chubproject_save = kwargs.get("chubproject_save")
     if chubproject_save:
@@ -95,6 +96,9 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     entrypoint = kwargs.get("entrypoint")
     if entrypoint:
         args += ["--entrypoint", entrypoint]
+
+    if kwargs.get("verbose"):
+        args += ["--verbose"]
 
     # Includes: --include FILE[::dest]
     includes = kwargs.get("includes")
@@ -121,10 +125,12 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
             val = v if isinstance(v, str) else ",".join(v)
             args += ["--metadata-entry", f"{k}={val}"]
 
+    args += ["--chub", str(chub_out)]
+
     env = os.environ.copy()
     env["PYTHONPATH"] = str(test_env["src_dir"])
 
-    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+    result = subprocess.run(args, cwd=str(test_env["test_pkg_dir"]), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     return result, chub_out
 
 

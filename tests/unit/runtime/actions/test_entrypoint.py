@@ -114,3 +114,13 @@ def test_console_script_falls_back_to_spawnvp_when_missing_local(monkeypatch, tm
     assert rc == 42
     assert called["file"] == "cli-tool"
     assert called["args"] == ["cli-tool", "--flag", "1"]
+
+
+def test_dry_run_prints_message_and_returns_zero(capsys, tmp_path):
+    python = tmp_path / "bin" / "python"
+
+    rc = entrypoint._run_entrypoint_with_python(python, True, "pkg.mod:func", ["--arg"])
+    captured = capsys.readouterr()
+
+    assert rc == 0
+    assert "[dry-run] would run entrypoint: pkg.mod:func" in captured.out

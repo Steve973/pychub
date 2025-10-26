@@ -6,6 +6,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+from pychub.runtime.runtime_options_processor import validate_and_imply
 from .chubconfig import load_chubconfig
 from .discover import discover_wheels
 from .entrypoint import _run_entrypoint_with_python
@@ -18,10 +19,18 @@ from .version import show_version
 from ..cli import build_parser
 from ..constants import CHUB_LIBS_DIR
 from ..utils import die
-from ..rt_options_processor import validate_and_imply
+
+
+def check_python_version():
+    if sys.version_info < (3, 9):
+        raise Exception("Must be using Python 3.9 or higher")
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Ensure we're running Python 3.9+ before proceeding
+    check_python_version()
+
+    # Parse the provided arguments
     argv = sys.argv[1:] if argv is None else argv
     parser = build_parser()
     # We use parse_known_args so args after "--" fall into `passthru`.
@@ -58,8 +67,6 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if getattr(args, "unpack", None):
-        if not args.unpack:
-            args.unpack = "."
         unpack_chub(bundle_root, Path(args.unpack))
         return
 
@@ -151,5 +158,5 @@ def main(argv: list[str] | None = None) -> None:
         shutil.rmtree(temp_root, ignore_errors=True)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
