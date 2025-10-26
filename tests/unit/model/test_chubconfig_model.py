@@ -753,13 +753,16 @@ def test_config_is_frozen():
         config.name = "changed"
 
 
-def test_config_has_slots():
-    """Validate that ChubProject has __slots__ defined (3.10+: no __dict__)."""
+def test_chubproject_has_slots():
+    """Validate that ChubProject uses slots when supported."""
     config = ChubProject()
-
     cls = type(config)
-    assert hasattr(cls, "__slots__"), "ChubProject is missing __slots__"
 
-    # Only check __dict__ absence in Python 3.10+
     if sys.version_info >= (3, 10):
-        assert not hasattr(config, "__dict__"), "ChubProject unexpectedly has __dict__"
+        # Python 3.10+ truly supports dataclass(slots=True)
+        assert hasattr(cls, "__slots__"), "Expected __slots__ on 3.10+"
+        assert not hasattr(config, "__dict__"), "Expected __dict__ to be removed on 3.10+"
+    else:
+        # 3.9 shim: slots arg is stripped; class should *not* have __slots__
+        assert not hasattr(cls, "__slots__"), "__slots__ should not exist under shimmed 3.9"
+        assert hasattr(config, "__dict__"), "Shimmed 3.9 should still have __dict__"
