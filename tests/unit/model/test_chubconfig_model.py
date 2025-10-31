@@ -23,10 +23,11 @@ def test_from_mapping_minimal():
     assert config.name == "test-package"
     assert config.version == "1.0.0"
     assert config.entrypoint is None
-    assert config.wheels == {}
     assert config.includes == []
     assert config.scripts.pre == []
     assert config.scripts.post == []
+    assert config.pinned_wheels == []
+    assert config.targets == []
     assert config.metadata == {}
 
 
@@ -45,6 +46,12 @@ def test_from_mapping_all_fields():
             "pre": ["pre_script.sh"],
             "post": ["post_script.sh", "cleanup.sh"]
         },
+        "pinned_wheels": [
+            "main==1.2.3",
+            "dep1==2.3.4",
+            "dep2==3.4.5"
+        ],
+        "targets": ["target1", "target2"],
         "metadata": {"author": "Test Author", "description": "A test package"}
     }
     config = ChubConfig.from_mapping(mapping)
@@ -52,13 +59,11 @@ def test_from_mapping_all_fields():
     assert config.name == "full-package"
     assert config.version == "2.5.3"
     assert config.entrypoint == "module:function"
-    assert config.wheels == {
-        "main.whl": ["dep1.whl", "dep2.whl"],
-        "other.whl": []
-    }
     assert config.includes == ["file1.txt", "file2.py"]
     assert config.scripts.pre == ["pre_script.sh"]
     assert config.scripts.post == ["post_script.sh", "cleanup.sh"]
+    assert config.pinned_wheels == ["main==1.2.3", "dep1==2.3.4", "dep2==3.4.5"]
+    assert config.targets == ["target1", "target2"]
     assert config.metadata == {"author": "Test Author", "description": "A test package"}
 
 
@@ -79,17 +84,19 @@ def test_from_mapping_handles_none_values():
     mapping = {
         "name": "test",
         "version": "1.0.0",
-        "wheels": None,
         "includes": None,
         "scripts": None,
+        "pinned_wheels": None,
+        "targets": None,
         "metadata": None
     }
     config = ChubConfig.from_mapping(mapping)
 
-    assert config.wheels == {}
     assert config.includes == []
     assert config.scripts.pre == []
     assert config.scripts.post == []
+    assert config.pinned_wheels == []
+    assert config.targets == []
     assert config.metadata == {}
 
 
@@ -99,17 +106,17 @@ def test_from_mapping_converts_types():
         "name": 123,  # Should be converted to string
         "version": 1.0,  # Should be converted to string
         "entrypoint": 456,  # Should be converted to string
-        "wheels": {
-            "789.whl": ["111.whl", "222.whl"]  # Keys and values should be converted to strings
-        },
-        "includes": [111, 222]  # Should be converted to strings
+        "includes": [111, 222],  # Should be converted to strings
+        "pinned_wheels": ["789==1.2.3", "111==2.3.4", "222==3.4.5"],
+        "targets": ["target1", "target2"]
     }
     config = ChubConfig.from_mapping(mapping)
 
     assert config.name == "123"
     assert config.version == "1.0"
     assert config.entrypoint == "456"
-    assert config.wheels == {"789.whl": ["111.whl", "222.whl"]}
+    assert config.pinned_wheels == ["789==1.2.3", "111==2.3.4", "222==3.4.5"]
+    assert config.targets == ["target1", "target2"]
     assert config.includes == ["111", "222"]
 
 
@@ -196,10 +203,6 @@ def test_from_yaml_full():
 name: full-package
 version: 2.5.3
 entrypoint: module:function
-wheels:
-  main.whl:
-    - dep1.whl
-    - dep2.whl
 includes:
   - file1.txt
   - file2.py
@@ -208,6 +211,13 @@ scripts:
     - pre_script.sh
   post:
     - post_script.sh
+pinned_wheels:
+  - main==1.2.3
+  - dep1==2.3.4
+  - dep2==3.4.5
+targets:
+  - target1
+  - target2
 metadata:
   author: Test Author
 """
@@ -216,10 +226,11 @@ metadata:
     assert config.name == "full-package"
     assert config.version == "2.5.3"
     assert config.entrypoint == "module:function"
-    assert config.wheels == {"main.whl": ["dep1.whl", "dep2.whl"]}
     assert config.includes == ["file1.txt", "file2.py"]
     assert config.scripts.pre == ["pre_script.sh"]
     assert config.scripts.post == ["post_script.sh"]
+    assert config.pinned_wheels == ["main==1.2.3", "dep1==2.3.4", "dep2==3.4.5"]
+    assert config.targets == ["target1", "target2"]
     assert config.metadata == {"author": "Test Author"}
 
 
@@ -268,6 +279,13 @@ scripts:
     - setup.sh
   post:
     - cleanup.sh
+pinned_wheels:
+  - main==1.2.3
+  - dep1==2.3.4
+  - dep2==3.4.5
+targets:
+  - target1
+  - target2
 metadata:
   license: MIT
 """, encoding="utf-8")
@@ -277,10 +295,11 @@ metadata:
     assert config.name == "full-file-package"
     assert config.version == "1.0.0"
     assert config.entrypoint == "app:main"
-    assert config.wheels == {"app.whl": ["requests.whl"]}
     assert config.includes == ["README.md"]
     assert config.scripts.pre == ["setup.sh"]
     assert config.scripts.post == ["cleanup.sh"]
+    assert config.pinned_wheels == ["main==1.2.3", "dep1==2.3.4", "dep2==3.4.5"]
+    assert config.targets == ["target1", "target2"]
     assert config.metadata == {"license": "MIT"}
 
 
@@ -332,9 +351,10 @@ def test_to_mapping_minimal():
     assert mapping["name"] == "test"
     assert mapping["version"] == "1.0.0"
     assert mapping["entrypoint"] is None
-    assert mapping["wheels"] == {}
     assert mapping["includes"] == []
     assert mapping["scripts"] == {"pre": [], "post": []}
+    assert mapping["pinned_wheels"] == []
+    assert mapping["targets"] == []
     assert mapping["metadata"] == {}
 
 
@@ -344,9 +364,10 @@ def test_to_mapping_full():
         name="full",
         version="2.0.0",
         entrypoint="mod:func",
-        wheels={"a.whl": ["b.whl"]},
         includes=["file.txt"],
         scripts=Scripts(pre=["pre.sh"], post=["post.sh"]),
+        pinned_wheels=["a==1.2.3", "b==3.4.5"],
+        targets=["target1", "target2"],
         metadata={"key": "value"}
     )
     mapping = config.to_mapping()
@@ -354,9 +375,10 @@ def test_to_mapping_full():
     assert mapping["name"] == "full"
     assert mapping["version"] == "2.0.0"
     assert mapping["entrypoint"] == "mod:func"
-    assert mapping["wheels"] == {"a.whl": ["b.whl"]}
     assert mapping["includes"] == ["file.txt"]
     assert mapping["scripts"] == {"pre": ["pre.sh"], "post": ["post.sh"]}
+    assert mapping["pinned_wheels"] == ["a==1.2.3", "b==3.4.5"]
+    assert mapping["targets"] == ["target1", "target2"]
     assert mapping["metadata"] == {"key": "value"}
 
 
@@ -366,24 +388,27 @@ def test_to_mapping_creates_copies():
     config = ChubConfig(
         name="test",
         version="1.0.0",
-        wheels={"a.whl": ["b.whl"]},
         includes=["file.txt"],
         scripts=scripts,
+        pinned_wheels=["a==1.2.3", "b==2.3.4"],
+        targets=["target1", "target2"],
         metadata={"meta": "data"}
     )
 
     mapping = config.to_mapping()
 
     # Modify the mapping
-    mapping["wheels"]["a.whl"].append("c.whl")
     mapping["includes"].append("other.txt")
     mapping["scripts"]["pre"].append("other.sh")
+    mapping["pinned_wheels"].append("c==3.4.5")
+    mapping["targets"].append("target3")
     mapping["metadata"]["meta2"] = "data2"
 
     # Original config should be unchanged (frozen dataclass)
-    assert config.wheels == {"a.whl": ["b.whl"]}
     assert config.includes == ["file.txt"]
     assert config.scripts.pre == ["pre.sh"]
+    assert config.pinned_wheels == ["a==1.2.3", "b==2.3.4"]
+    assert config.targets == ["target1", "target2"]
     assert config.metadata == {"meta": "data"}
 
 
@@ -405,9 +430,10 @@ def test_to_json_full():
         name="full",
         version="2.0.0",
         entrypoint="mod:func",
-        wheels={"a.whl": ["b.whl"]},
         includes=["file.txt"],
         scripts=Scripts(pre=["pre.sh"], post=["post.sh"]),
+        pinned_wheels=["a==1.2.3", "b==3.4.5"],
+        targets=["target1", "target2"],
         metadata={"key": "value"}
     )
     json_str = config.to_json()
@@ -416,9 +442,10 @@ def test_to_json_full():
     assert parsed["name"] == "full"
     assert parsed["version"] == "2.0.0"
     assert parsed["entrypoint"] == "mod:func"
-    assert parsed["wheels"] == {"a.whl": ["b.whl"]}
     assert parsed["includes"] == ["file.txt"]
     assert parsed["scripts"] == {"pre": ["pre.sh"], "post": ["post.sh"]}
+    assert parsed["pinned_wheels"] == ["a==1.2.3", "b==3.4.5"]
+    assert parsed["targets"] == ["target1", "target2"]
     assert parsed["metadata"] == {"key": "value"}
 
 
@@ -473,9 +500,10 @@ def test_to_yaml_full():
         name="full",
         version="2.0.0",
         entrypoint="mod:func",
-        wheels={"a.whl": ["b.whl"]},
         includes=["file.txt"],
         scripts=Scripts(pre=["pre.sh"], post=["post.sh"]),
+        pinned_wheels=["a==1.2.3", "b==3.4.5"],
+        targets=["target1", "target2"],
         metadata={"key": "value"}
     )
     yaml_str = config.to_yaml()
@@ -484,9 +512,10 @@ def test_to_yaml_full():
     assert parsed["name"] == "full"
     assert parsed["version"] == "2.0.0"
     assert parsed["entrypoint"] == "mod:func"
-    assert parsed["wheels"] == {"a.whl": ["b.whl"]}
     assert parsed["includes"] == ["file.txt"]
     assert parsed["scripts"] == {"pre": ["pre.sh"], "post": ["post.sh"]}
+    assert parsed["pinned_wheels"] == ["a==1.2.3", "b==3.4.5"]
+    assert parsed["targets"] == ["target1", "target2"]
     assert parsed["metadata"] == {"key": "value"}
 
 
@@ -537,9 +566,10 @@ def test_validate_success_full():
         name="full",
         version="2.0.0",
         entrypoint="module:function",
-        wheels={"main.whl": ["dep.whl"], "other.whl": []},
         includes=["file.txt"],
         scripts=Scripts(pre=["pre.sh"], post=["post.sh"]),
+        pinned_wheels=["main==1.2.3", "dep==3.4.5", "other==5.6.7"],
+        targets=["target1", "target2"],
         metadata={"key": "value"}
     )
     config.validate()  # Should not raise
@@ -556,28 +586,6 @@ def test_validate_fails_empty_version():
     """Test validation fails with empty version."""
     config = ChubConfig(name="test", version="")
     with pytest.raises(ValueError, match="version is required"):
-        config.validate()
-
-
-def test_validate_fails_wheel_without_extension():
-    """Test validation fails when wheel key doesn't end with .whl."""
-    config = ChubConfig(
-        name="test",
-        version="1.0.0",
-        wheels={"invalid-wheel": []}
-    )
-    with pytest.raises(ValueError, match="wheel key must end with .whl"):
-        config.validate()
-
-
-def test_validate_fails_dependency_without_extension():
-    """Test validation fails when dependency doesn't end with .whl."""
-    config = ChubConfig(
-        name="test",
-        version="1.0.0",
-        wheels={"main.whl": ["invalid-dep"]}
-    )
-    with pytest.raises(ValueError, match="dependency must end with .whl"):
         config.validate()
 
 
@@ -617,7 +625,7 @@ def test_validate_allows_empty_wheels():
     config = ChubConfig(
         name="test",
         version="1.0.0",
-        wheels={}
+        pinned_wheels=[]
     )
     config.validate()  # Should not raise
 
@@ -627,12 +635,10 @@ def test_validate_multiple_wheel_errors():
     config = ChubConfig(
         name="test",
         version="1.0.0",
-        wheels={
-            "invalid1": [],
-            "invalid2": []
-        }
+        pinned_wheels = ["a=1.2.3", "b>=3.4.5"],
+        targets = ["target1", "target2"],
     )
-    with pytest.raises(ValueError, match="wheel key must end with .whl"):
+    with pytest.raises(ValueError, match="pinned wheel must be in the format 'name==ver': a=1.2.3"):
         config.validate()
 
 
@@ -644,9 +650,10 @@ def test_roundtrip_mapping():
         name="roundtrip",
         version="1.0.0",
         entrypoint="app:main",
-        wheels={"app.whl": ["dep.whl"]},
         includes=["file.txt"],
         scripts=Scripts(pre=["pre.sh"], post=["post.sh"]),
+        pinned_wheels=["a==1.2.3", "b==3.4.5"],
+        targets=["target1", "target2"],
         metadata={"key": "value"}
     )
 
@@ -656,10 +663,11 @@ def test_roundtrip_mapping():
     assert restored.name == original.name
     assert restored.version == original.version
     assert restored.entrypoint == original.entrypoint
-    assert restored.wheels == original.wheels
     assert restored.includes == original.includes
     assert restored.scripts.pre == original.scripts.pre
     assert restored.scripts.post == original.scripts.post
+    assert restored.pinned_wheels == original.pinned_wheels
+    assert restored.targets == original.targets
     assert restored.metadata == original.metadata
 
 
@@ -669,9 +677,10 @@ def test_roundtrip_yaml():
         name="roundtrip",
         version="1.0.0",
         entrypoint="app:main",
-        wheels={"app.whl": ["dep.whl"]},
         includes=["file.txt"],
         scripts=Scripts(pre=["pre.sh"], post=["post.sh"]),
+        pinned_wheels=["a==1.2.3", "b==3.4.5"],
+        targets=["target1", "target2"],
         metadata={"key": "value"}
     )
 
@@ -681,10 +690,11 @@ def test_roundtrip_yaml():
     assert restored.name == original.name
     assert restored.version == original.version
     assert restored.entrypoint == original.entrypoint
-    assert restored.wheels == original.wheels
     assert restored.includes == original.includes
     assert restored.scripts.pre == original.scripts.pre
     assert restored.scripts.post == original.scripts.post
+    assert restored.pinned_wheels == original.pinned_wheels
+    assert restored.targets == original.targets
     assert restored.metadata == original.metadata
 
 
@@ -694,9 +704,10 @@ def test_roundtrip_file(tmp_path):
         name="roundtrip",
         version="1.0.0",
         entrypoint="app:main",
-        wheels={"app.whl": ["dep.whl"]},
         includes=["file.txt"],
         scripts=Scripts(pre=["pre.sh"], post=["post.sh"]),
+        pinned_wheels=["a==1.2.3", "b==3.4.5"],
+        targets=["target1", "target2"],
         metadata={"key": "value"}
     )
 
@@ -707,10 +718,11 @@ def test_roundtrip_file(tmp_path):
     assert restored.name == original.name
     assert restored.version == original.version
     assert restored.entrypoint == original.entrypoint
-    assert restored.wheels == original.wheels
     assert restored.includes == original.includes
     assert restored.scripts.pre == original.scripts.pre
     assert restored.scripts.post == original.scripts.post
+    assert restored.pinned_wheels == original.pinned_wheels
+    assert restored.targets == original.targets
     assert restored.metadata == original.metadata
 
 

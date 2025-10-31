@@ -1,0 +1,4 @@
+[tool.pychub.package]
+name = "test-project"
+version = "1.0.0"
+entrypoint = "test:main"

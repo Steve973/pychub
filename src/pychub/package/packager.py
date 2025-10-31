@@ -19,7 +19,7 @@ from .constants import (
     CHUB_PRE_INSTALL_SCRIPTS_DIR,
     CHUB_BUILD_DIR_STRUCTURE,
     CHUB_INCLUDES_DIR)
-from .pathdeps.discover import collect_path_dependencies
+from .lifecycle.plan.dep_resolution.path_deps_resolver import collect_path_dependencies
 from ..model.chubconfig_model import ChubConfig
 from ..model.chubproject_model import ChubProject
 
@@ -339,9 +339,8 @@ def build_chub(chubproject: ChubProject) -> Path:
         else Path(".").resolve())
 
     wheel_paths: list[Path] = []
-    if chubproject.wheel:
-        wheel_paths.append(Path(chubproject.wheel).expanduser().resolve())
-    wheel_paths.extend(_paths(chubproject.add_wheels))
+    if chubproject.wheels:
+        wheel_paths.extend(_paths(chubproject.wheels))
 
     post_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.post, project_dir)) if chubproject.scripts.post else []
     pre_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.pre, project_dir)) if chubproject.scripts.pre else []

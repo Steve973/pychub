@@ -149,7 +149,7 @@ def test_chubproject_tool_table_exists():
             }
         }
     }
-    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    result = ChubProject._select_package_table(doc, "valid_chubproject.toml")
     assert result == {"wheel": "wheel.whl"}
 
 
@@ -159,7 +159,7 @@ def test_chubproject_pychub_package_root_level():
             "package": {"wheel": "wheel.whl"}
         }
     }
-    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    result = ChubProject._select_package_table(doc, "valid_chubproject.toml")
     assert result == {"wheel": "wheel.whl"}
 
 
@@ -167,7 +167,7 @@ def test_chubproject_package_flat():
     doc = {
         "package": {"wheel": "pkg.whl"}
     }
-    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    result = ChubProject._select_package_table(doc, "valid_chubproject.toml")
     assert result == {"wheel": "pkg.whl"}
 
 
@@ -176,7 +176,7 @@ def test_chubproject_flat_document_used_as_fallback(capfd):
         "wheel": "flat.whl",
         "entrypoint": "main:run"
     }
-    result = ChubProject._select_package_table(doc, "chubproject.toml")
+    result = ChubProject._select_package_table(doc, "valid_chubproject.toml")
     assert result == doc
     assert "flat table" in capfd.readouterr().out
 
@@ -190,14 +190,14 @@ def test_unrecognized_filename_is_skipped(capfd):
 
 @pytest.mark.parametrize("name,arg,expected", [
     ("pyproject.toml", None, "tool.pychub.package"),
-    ("chubproject.toml", None, "tool.pychub.package"),
+    ("valid_chubproject.toml", None, "tool.pychub.package"),
     ("chubproject.build.toml", "flat", None),
-    ("my-chubproject.toml", "flat", None),
+    ("my-valid_chubproject.toml", "flat", None),
     ("my_chubproject.toml", "flat", None),
-    ("my.chubproject.toml", "flat", None),
-    ("chubproject.toml", "package", "package"),
-    ("chubproject.toml", "tool.pychub.package", "tool.pychub.package"),
-    ("chubproject.toml", "pychub.package", "pychub.package"),
+    ("my.valid_chubproject.toml", "flat", None),
+    ("valid_chubproject.toml", "package", "package"),
+    ("valid_chubproject.toml", "tool.pychub.package", "tool.pychub.package"),
+    ("valid_chubproject.toml", "pychub.package", "pychub.package"),
 ])
 def test_determine_table_path_valid(name, arg, expected):
     result = ChubProject.determine_table_path(Path(name), arg)
@@ -210,10 +210,10 @@ def test_determine_table_path_valid(name, arg, expected):
     ("notachubproject.toml", None),
     ("config.toml", "flat"),
     ("myproject.toml", "tool.pychub.package"),
-    ("chubproject.toml", "tool.pychub.packag"),  # typo
-    ("chubproject.toml", "pychub.package.extra"),  # too long
-    ("chubproject.toml", "packge"),  # misspelled
-    ("chubproject.toml", "pysub.package"),
+    ("valid_chubproject.toml", "tool.pychub.packag"),  # typo
+    ("valid_chubproject.toml", "pychub.package.extra"),  # too long
+    ("valid_chubproject.toml", "packge"),  # misspelled
+    ("valid_chubproject.toml", "pysub.package"),
 ])
 def test_determine_table_path_invalid(name, arg):
     with pytest.raises(ValueError):
@@ -225,4 +225,4 @@ def test_determine_table_path_invalid(name, arg):
 ])
 def test_invalid_table_args(arg):
     with pytest.raises(ValueError, match="Invalid table_arg"):
-        ChubProject.determine_table_path(Path("chubproject.toml"), arg)
+        ChubProject.determine_table_path(Path("valid_chubproject.toml"), arg)

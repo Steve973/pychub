@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import glob
 import json
 import os
 import re
@@ -26,7 +25,7 @@ try:  # pragma: no cover
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
-# --- optional writers: pick any one to be installed ---
+# --- optional writers: pick any writer to be installed ---
 _TOML_WRITER = None
 for _name in ("tomli_w", "tomlkit", "toml"):  # pragma: no cover
     try:
@@ -38,16 +37,6 @@ for _name in ("tomli_w", "tomlkit", "toml"):  # pragma: no cover
 
 class ChubProjectError(Exception):
     pass
-
-
-def resolve_wheels(mw: str | None = None, aw: list[str] | None = None) -> tuple[str | None, list[str]]:
-    if mw:
-        return mw, aw
-
-    cwd = os.getcwd()
-    files = sorted(glob.glob(os.path.join(cwd, "dist", "*.whl")))
-    main_wheel, *additional_wheels = files
-    return main_wheel, additional_wheels
 
 
 def get_wheel_name_version(wheel_path: Path) -> tuple[str, str]:
@@ -74,11 +63,15 @@ def get_wheel_name_version(wheel_path: Path) -> tuple[str, str]:
 @dataclass(slots=True)
 class ChubProject:
     # flat fields (one-shot build config)
-    wheel: Optional[str] = None
-    add_wheels: List[str] = None  # normalized to list in factories
+    name: Optional[str] = None
+    version: Optional[str] = None
+    project_path: Optional[str] = None
+    wheels: Optional[List[str]] = None
     chub: Optional[str] = None
     entrypoint: Optional[str] = None
+    entrypoint_args: Optional[list[str]] = None
     includes: List["IncludeSpec"] = None
+    include_chubs: List[str] = None
     verbose: bool = False
     metadata: Dict[str, Any] = None
     scripts: Scripts = None
@@ -89,18 +82,26 @@ class ChubProject:
     def from_mapping(m: Mapping[str, Any] | None) -> "ChubProject":
         """One-shot: build directly from a *package-like* mapping (no namespacing here)."""
         if not m:
-            return ChubProject(add_wheels=[], includes=[], metadata={}, scripts=Scripts())
-
-        main_wheel, additional_wheels = resolve_wheels(m.get("wheel"), m.get("add_wheels") or [])
-
+            return ChubProject(wheels=[], includes=[], metadata={}, scripts=Scripts())
+        project_path = m.get("project_path") or os.getcwd()
+        wheels = m.get("wheel") or []
+        main_wheel = wheels[0] if wheels else None
+        wheel_name, wheel_version = get_wheel_name_version(Path(main_wheel)) if main_wheel else (None, None)
+        name = m.get("name") or wheel_name
+        version = m.get("version") or wheel_version
         includes = [IncludeSpec.parse(item) for item in (m.get("includes") or [])]
+        include_chubs = m.get("include_chubs") or []
 
         return ChubProject(
-            wheel=main_wheel,
-            add_wheels=additional_wheels,
+            name=name,
+            version=version,
+            project_path=project_path,
+            wheels=wheels,
             chub=str(m["chub"]) if m.get("chub") else None,
             entrypoint=str(m["entrypoint"]) if m.get("entrypoint") else None,
+            entrypoint_args=m.get("entrypoint_args", []),
             includes=includes,
+            include_chubs=include_chubs,
             verbose=bool(m.get("verbose", False)),
             metadata=dict(m.get("metadata") or {}),
             scripts=Scripts.from_mapping(m.get("scripts")))
@@ -128,17 +129,28 @@ class ChubProject:
           metadata_entry (repeatable)
         """
         # scalars
-        wheel = str(args.get("wheel")) if args.get("wheel") else None
-        chub = str(args.get("chub") ) if args.get("chub") else None
+        chub = args.get("chub") if args.get("chub") else None
         entrypoint = str(args.get("entrypoint")) if args.get("entrypoint") else None
         verbose = bool(args.get("verbose", False))
+        project_path = str(args.get("project_path")) if args.get("project_path") else os.getcwd()
 
         # lists
-        add_wheels = ChubProject._comma_split_maybe(args.get("add_wheel"))
+        wheels = str(args.get("wheel")) if args.get("wheel") else []
+        main_wheel = wheels[0] if wheels else None
+        wheel_name, wheel_version = get_wheel_name_version(Path(main_wheel)) if main_wheel else (None, None)
+        name = args.get("name") or wheel_name
+        spdx_licenses = args.get("spdx_license") or []
+        version = args.get("version") or wheel_version
 
-        # includes: --include; list or comma-separated
+        # entrypoint args: --entrypoint-args (repeatable)
+        entrypoint_args = args.get("entrypoint_args") or []
+
+        # includes: --include (list or comma-separated)
         inc_raw = args.get("include") or []
         includes = [IncludeSpec.parse(s) for s in ChubProject._comma_split_maybe(inc_raw)]
+
+        # Chub files to include: --include-chub (repeatable)
+        include_chubs = args.get("include_chub") or []
 
         # scripts: --pre-script, --post-script
         pre = ChubProject._comma_split_maybe(ChubProject._flatten(args.get("pre_script")))
@@ -162,14 +174,18 @@ class ChubProject:
             metadata[k] = [p.strip() for p in v.split(",")] if "," in v else v
 
         return ChubProject(
-        wheel=wheel,
-        add_wheels=add_wheels,
-        chub=chub,
-        entrypoint=entrypoint,
-        includes=includes,
-        verbose=verbose,
-        metadata=metadata,
-        scripts=scripts)
+            name=name,
+            version=version,
+            project_path=project_path,
+            wheels=wheels,
+            chub=chub,
+            entrypoint=entrypoint,
+            entrypoint_args=entrypoint_args,
+            includes=includes,
+            include_chubs=include_chubs,
+            verbose=verbose,
+            metadata=metadata,
+            scripts=scripts)
 
     # ------------------- immutable merges -------------------
 
@@ -184,22 +200,27 @@ class ChubProject:
         """
         inc = ChubProject.from_cli_args(args)
 
-        wheel      = existing.wheel if inc.wheel is None else inc.wheel
-        chub       = inc.chub or existing.chub
-        entrypoint = existing.entrypoint if inc.entrypoint is None else inc.entrypoint
-        verbose    = existing.verbose or inc.verbose
+        name = existing.name if inc.name is None else inc.name
+        version = existing.version if inc.version is None else inc.version
+        project_path = existing.project_path if inc.project_path is None else inc.project_path
 
-        add_wheels = ChubProject._dedup([*(existing.add_wheels or []), *(inc.add_wheels or [])])
-        includes   = ChubProject._dedup_includes(existing.includes or [], inc.includes or [])
+        wheels = existing.wheels + inc.wheels if inc.wheels else existing.wheels
+        chub = inc.chub or existing.chub
+        entrypoint = existing.entrypoint if inc.entrypoint is None else inc.entrypoint
+        entrypoint_args = existing.entrypoint_args + inc.entrypoint_args if inc.entrypoint_args else existing.entrypoint_args
+        verbose = existing.verbose or inc.verbose
+
+        includes = ChubProject._dedup_includes(existing.includes or [], inc.includes or [])
+        include_chubs = existing.include_chubs + inc.include_chubs if inc.include_chubs else existing.include_chubs
 
         # scripts: only extend if the caller provided some
         provided_scripts = bool(inc.scripts and (inc.scripts.pre or inc.scripts.post))
         if provided_scripts:
             scripts = Scripts().from_mapping({
                 "pre": ChubProject._dedup([*(existing.scripts.pre if existing.scripts else []),
-                                          *(inc.scripts.pre if inc.scripts else [])]),
+                                           *(inc.scripts.pre if inc.scripts else [])]),
                 "post": ChubProject._dedup([*(existing.scripts.post if existing.scripts else []),
-                                          *(inc.scripts.post if inc.scripts else [])])
+                                            *(inc.scripts.post if inc.scripts else [])])
             })
         else:
             scripts = existing.scripts or Scripts()
@@ -211,11 +232,15 @@ class ChubProject:
                 meta[k] = v
 
         return ChubProject(
-            wheel=wheel,
-            add_wheels=add_wheels,
+            name=name,
+            version=version,
+            project_path=project_path,
+            wheels=wheels,
             chub=chub,
             entrypoint=entrypoint,
+            entrypoint_args=entrypoint_args,
             includes=includes,
+            include_chubs=include_chubs,
             verbose=verbose,
             metadata=meta,
             scripts=scripts)
@@ -231,13 +256,18 @@ class ChubProject:
         """
         inc = ChubProject.from_cli_args(args)
 
-        wheel      = inc.wheel if inc.wheel is not None else existing.wheel
-        chub       = inc.chub or existing.chub
-        entrypoint = inc.entrypoint if inc.entrypoint is not None else existing.entrypoint
-        verbose    = existing.verbose or inc.verbose
+        name = inc.name if inc.name is not None else existing.name
+        version = inc.version if inc.version is not None else existing.version
+        project_path = inc.project_path if inc.project_path is not None else existing.project_path
 
-        add_wheels = inc.add_wheels if inc.add_wheels else (existing.add_wheels or [])
-        includes   = inc.includes   if inc.includes   else (existing.includes or [])
+        wheels = inc.wheels if inc.wheels is not None else existing.wheels
+        chub = inc.chub or existing.chub
+        entrypoint = inc.entrypoint if inc.entrypoint is not None else existing.entrypoint
+        entrypoint_args = inc.entrypoint_args if inc.entrypoint_args is not None else existing.entrypoint_args
+        verbose = existing.verbose or inc.verbose
+
+        includes = inc.includes if inc.includes else (existing.includes or [])
+        include_chubs = inc.include_chubs if inc.include_chubs else (existing.include_chubs or [])
 
         scripts = existing.scripts or Scripts()
         if inc.scripts and (inc.scripts.pre or inc.scripts.post):
@@ -247,11 +277,15 @@ class ChubProject:
         meta.update(inc.metadata or {})
 
         return ChubProject(
-            wheel=wheel,
-            add_wheels=add_wheels,
+            name=name,
+            version=version,
+            project_path=project_path,
+            wheels=wheels,
             chub=chub,
             entrypoint=entrypoint,
+            entrypoint_args=entrypoint_args,
             includes=includes,
+            include_chubs=include_chubs,
             verbose=verbose,
             metadata=meta,
             scripts=scripts)
@@ -452,15 +486,18 @@ class ChubProject:
 
     # ------------------- instance methods -------------------
 
-
     def to_mapping(self) -> Dict[str, Any]:
         """Dump back into a plain mapping (for export/round-tripping)."""
         return {
-            "wheel": self.wheel,
-            "add_wheels": list(self.add_wheels or []),
+            "name": self.name,
+            "version": self.version,
+            "project_path": self.project_path,
+            "wheels": list(self.wheels or []),
             "chub": self.chub,
             "entrypoint": self.entrypoint,
+            "entrypoint_args": list(self.entrypoint_args) or [],
             "includes": [inc.as_string() for inc in (self.includes or [])],
+            "include_chubs": self.include_chubs or [],
             "verbose": self.verbose,
             "metadata": dict(self.metadata or {}),
             "scripts": self.scripts.to_mapping() if self.scripts else {"pre": [], "post": []},

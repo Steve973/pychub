@@ -6,10 +6,10 @@ from tests.integration.conftest import run_build_cli, get_chub_contents
 
 
 def test_build_uses_chubproject_toml(test_env, tmp_path):
-    """Verify chubproject.toml alone is enough to build a chub."""
+    """Verify valid_chubproject.toml alone is enough to build a chub."""
     test_proj = test_env["test_pkg_dir"]
     wheel = test_env["wheel_path"]
-    chubproject_location = Path(test_proj / "chubproject.toml").resolve()
+    chubproject_location = Path(test_proj / "valid_chubproject.toml").resolve()
 
     result, chub = run_build_cli(wheel, tmp_path, test_env, chubproject=str(chubproject_location))
 
@@ -22,11 +22,11 @@ def test_build_uses_chubproject_toml(test_env, tmp_path):
 
 
 def test_cli_overrides_toml_metadata(test_env, tmp_path):
-    """CLI metadata should override chubproject.toml values."""
+    """CLI metadata should override valid_chubproject.toml values."""
     test_proj = test_env["test_pkg_dir"]
     wheel = test_env["wheel_path"]
 
-    shutil.copy(test_proj / "chubproject.toml", tmp_path)
+    shutil.copy(test_proj / "valid_chubproject.toml", tmp_path)
 
     override_meta = {"author": "Overridden via CLI"}
     result, chub = run_build_cli(wheel, tmp_path, test_env, metadata=override_meta)
@@ -37,10 +37,10 @@ def test_cli_overrides_toml_metadata(test_env, tmp_path):
 
 
 def test_scripts_are_pulled_from_toml(test_env, tmp_path):
-    """Ensure script files listed in chubproject.toml are bundled correctly."""
+    """Ensure script files listed in valid_chubproject.toml are bundled correctly."""
     test_proj = test_env["test_pkg_dir"]
     wheel = test_env["wheel_path"]
-    chubproject_location = Path(test_proj / "chubproject.toml").resolve()
+    chubproject_location = Path(test_proj / "valid_chubproject.toml").resolve()
 
     result, chub = run_build_cli(wheel, tmp_path, test_env, chubproject=str(chubproject_location))
 

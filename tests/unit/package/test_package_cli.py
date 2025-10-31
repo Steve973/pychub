@@ -1,234 +1,396 @@
-from argparse import ArgumentError
+import argparse
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 
+from pychub.package import cli
 
-def test_main_creates_parser_and_calls_process_options(monkeypatch):
-    """Test that main() creates the parser, parses args, and calls process_options."""
-    from pychub.package import cli
 
-    # Mock process_options to capture what it's called with
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
+# ===========================
+# Parser Creation Tests
+# ===========================
 
-    # Mock sys.argv to provide test arguments
-    test_args = ["pychub", "mywheel.whl", "--verbose"]
-    monkeypatch.setattr("sys.argv", test_args)
+def test_create_arg_parser_returns_argument_parser():
+    """Test that create_arg_parser returns an ArgumentParser instance."""
+    parser = cli.create_arg_parser()
+    assert isinstance(parser, argparse.ArgumentParser)
 
-    # Call main
-    cli.main()
 
-    # Verify process_options was called once
-    assert mock_process.call_count == 1
+def test_parser_has_correct_prog_name():
+    """Test that parser has correct program name."""
+    parser = cli.create_arg_parser()
+    assert parser.prog == "pychub"
 
-    # Verify the args passed to process_options
-    args = mock_process.call_args[0][0]
-    assert args.wheel == Path("mywheel.whl")
+
+def test_parser_has_description():
+    """Test that parser has a description."""
+    parser = cli.create_arg_parser()
+    assert "package a wheel" in parser.description
+
+
+# ===========================
+# Boolean Flag Tests
+# ===========================
+
+def test_analyze_compatibility_flag():
+    """Test --analyze-compatibility flag."""
+    parser = cli.create_arg_parser()
+    args = parser.parse_args(["--analyze-compatibility"])
+    assert args.analyze_compatibility is True
+
+    args = parser.parse_args([])
+    assert args.analyze_compatibility is False
+
+
+def test_verbose_flag():
+    """Test --verbose flag."""
+    parser = cli.create_arg_parser()
+    args = parser.parse_args(["--verbose"])
     assert args.verbose is True
 
-
-def test_main_parses_wheel_argument(monkeypatch):
-    """Test that wheel positional argument is parsed correctly."""
-    from pychub.package import cli
-
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", ["pychub", "dist/pkg.whl"])
-
-    cli.main()
-
-    args = mock_process.call_args[0][0]
-    assert args.wheel == Path("dist/pkg.whl")
+    args = parser.parse_args([])
+    assert args.verbose is False
 
 
-def test_main_parses_add_wheel_argument(monkeypatch):
-    """Test that --add-wheel arguments are parsed correctly."""
-    from pychub.package import cli
+def test_version_flag():
+    """Test -v/--version flag."""
+    parser = cli.create_arg_parser()
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", [
-        "pychub", "main.whl",
-        "-a", "dep1.whl", "dep2.whl",
-        "-a", "dep3.whl"
-    ])
+    args = parser.parse_args(["-v"])
+    assert args.version is True
 
-    cli.main()
+    args = parser.parse_args(["--version"])
+    assert args.version is True
 
-    args = mock_process.call_args[0][0]
-    # action="append" with nargs="+" creates nested lists
-    assert args.add_wheel == [[Path("dep1.whl"), Path("dep2.whl")], [Path("dep3.whl")]]
+    args = parser.parse_args([])
+    assert args.version is False
 
 
-def test_main_parses_chub_argument(monkeypatch):
-    """Test that --chub argument is parsed correctly."""
-    from pychub.package import cli
+# ===========================
+# Path Argument Tests
+# ===========================
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", ["pychub", "pkg.whl", "-c", "output.chub"])
+def test_chub_argument():
+    """Test -c/--chub argument converts to Path."""
+    parser = cli.create_arg_parser()
 
-    cli.main()
-
-    args = mock_process.call_args[0][0]
+    args = parser.parse_args(["-c", "output.chub"])
     assert args.chub == Path("output.chub")
 
+    args = parser.parse_args(["--chub", "path/to/file.chub"])
+    assert args.chub == Path("path/to/file.chub")
 
-def test_main_parses_chubproject_arguments(monkeypatch):
-    """Test that --chubproject and --chubproject-save are parsed correctly."""
-    from pychub.package import cli
+    args = parser.parse_args([])
+    assert args.chub is None
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", [
-        "pychub", "pkg.whl",
-        "--chubproject", "config.toml",
-        "--chubproject-save", "output.toml"
-    ])
 
-    cli.main()
+def test_chubproject_argument():
+    """Test --chubproject argument converts to Path."""
+    parser = cli.create_arg_parser()
 
-    args = mock_process.call_args[0][0]
+    args = parser.parse_args(["--chubproject", "config.toml"])
     assert args.chubproject == Path("config.toml")
+
+    args = parser.parse_args([])
+    assert args.chubproject is None
+
+
+def test_chubproject_save_argument():
+    """Test --chubproject-save argument converts to Path."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["--chubproject-save", "output.toml"])
     assert args.chubproject_save == Path("output.toml")
 
-
-def test_main_parses_table_argument(monkeypatch):
-    """Test that --table argument is parsed correctly."""
-    from pychub.package import cli
-
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", ["pychub", "pkg.whl", "-t", "custom.table"])
-
-    cli.main()
-
-    args = mock_process.call_args[0][0]
-    assert args.table == "custom.table"
+    args = parser.parse_args([])
+    assert args.chubproject_save is None
 
 
-def test_main_parses_entrypoint_argument(monkeypatch):
-    """Test that --entrypoint argument is parsed correctly."""
-    from pychub.package import cli
+# ===========================
+# String Argument Tests
+# ===========================
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", ["pychub", "pkg.whl", "-e", "module:function"])
+def test_entrypoint_argument():
+    """Test -e/--entrypoint argument."""
+    parser = cli.create_arg_parser()
 
-    cli.main()
-
-    args = mock_process.call_args[0][0]
+    args = parser.parse_args(["-e", "module:function"])
     assert args.entrypoint == "module:function"
 
+    args = parser.parse_args(["--entrypoint", "app.main:run"])
+    assert args.entrypoint == "app.main:run"
 
-def test_main_parses_include_argument(monkeypatch):
-    """Test that --include arguments are parsed correctly."""
-    from pychub.package import cli
+    args = parser.parse_args([])
+    assert args.entrypoint is None
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", [
-        "pychub", "pkg.whl",
-        "-i", "README.md::docs/", "config.yml"
-    ])
 
-    cli.main()
+def test_table_argument():
+    """Test -t/--table argument."""
+    parser = cli.create_arg_parser()
 
-    args = mock_process.call_args[0][0]
+    args = parser.parse_args(["-t", "custom.table"])
+    assert args.table == "custom.table"
+
+    args = parser.parse_args(["--table", "tool.myapp"])
+    assert args.table == "tool.myapp"
+
+    args = parser.parse_args([])
+    assert args.table is None
+
+
+def test_project_path_argument():
+    """Test --project-path argument with default."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["--project-path", "/path/to/project"])
+    assert args.project_path == "/path/to/project"
+
+    args = parser.parse_args([])
+    assert args.project_path == "."
+
+
+# ===========================
+# List/Extend Action Tests
+# ===========================
+
+def test_wheel_argument_single():
+    """Test -w/--wheel with single value."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["-w", "pkg.whl"])
+    assert args.wheel == ["pkg.whl"]
+
+    args = parser.parse_args(["--wheel", "dist/package.whl"])
+    assert args.wheel == ["dist/package.whl"]
+
+
+def test_wheel_argument_multiple():
+    """Test -w/--wheel with multiple values (extend action)."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["-w", "pkg1.whl", "pkg2.whl"])
+    assert args.wheel == ["pkg1.whl", "pkg2.whl"]
+
+    args = parser.parse_args(["-w", "a.whl", "-w", "b.whl", "c.whl"])
+    assert args.wheel == ["a.whl", "b.whl", "c.whl"]
+
+
+def test_wheel_argument_default_empty():
+    """Test --wheel defaults to empty list."""
+    parser = cli.create_arg_parser()
+    args = parser.parse_args([])
+    assert args.wheel == []
+
+
+def test_include_argument():
+    """Test -i/--include with extend action."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["-i", "file.txt"])
+    assert args.include == ["file.txt"]
+
+    args = parser.parse_args(["-i", "a.txt", "b.txt", "-i", "c.txt"])
+    assert args.include == ["a.txt", "b.txt", "c.txt"]
+
+    args = parser.parse_args(["--include", "README.md::docs/", "config.yml"])
     assert args.include == ["README.md::docs/", "config.yml"]
 
 
-def test_main_parses_metadata_entry_argument(monkeypatch):
-    """Test that --metadata-entry arguments are parsed correctly."""
-    from pychub.package import cli
+def test_include_chub_argument():
+    """Test --include-chub with extend action."""
+    parser = cli.create_arg_parser()
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", [
-        "pychub", "pkg.whl",
-        "-m", "key1=val1", "key2=val2",
-        "-m", "key3=val3"
-    ])
+    args = parser.parse_args(["--include-chub", "dep.chub"])
+    assert args.include_chub == ["dep.chub"]
 
-    cli.main()
+    args = parser.parse_args(["--include-chub", "a.chub", "b.chub"])
+    assert args.include_chub == ["a.chub", "b.chub"]
 
-    args = mock_process.call_args[0][0]
-    # action="append" with nargs="+" creates nested lists
-    assert args.metadata_entry == [["key1=val1", "key2=val2"], ["key3=val3"]]
+    args = parser.parse_args([])
+    assert args.include_chub == []
 
 
-def test_main_parses_script_arguments(monkeypatch):
-    """Test that --pre-script and --post-script are parsed correctly."""
-    from pychub.package import cli
+def test_metadata_entry_argument():
+    """Test -m/--metadata-entry with extend action."""
+    parser = cli.create_arg_parser()
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", [
-        "pychub", "pkg.whl",
-        "-p", "pre1.sh", "pre2.sh",
-        "-o", "post1.sh"
-    ])
+    args = parser.parse_args(["-m", "key=value"])
+    assert args.metadata_entry == ["key=value"]
 
-    cli.main()
+    args = parser.parse_args(["-m", "k1=v1", "k2=v2", "-m", "k3=v3"])
+    assert args.metadata_entry == ["k1=v1", "k2=v2", "k3=v3"]
 
-    args = mock_process.call_args[0][0]
-    assert args.pre_script == [["pre1.sh", "pre2.sh"]]
-    assert args.post_script == [["post1.sh"]]
+    args = parser.parse_args([])
+    assert args.metadata_entry is None
 
 
-def test_main_parses_verbose_flag(monkeypatch):
-    """Test that --verbose flag is parsed correctly."""
-    from pychub.package import cli
+def test_pre_script_argument():
+    """Test -p/--pre-script with extend action."""
+    parser = cli.create_arg_parser()
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", ["pychub", "pkg.whl", "--verbose"])
+    args = parser.parse_args(["-p", "setup.sh"])
+    assert args.pre_script == ["setup.sh"]
 
-    cli.main()
+    args = parser.parse_args(["-p", "a.sh", "b.sh", "-p", "c.sh"])
+    assert args.pre_script == ["a.sh", "b.sh", "c.sh"]
 
-    args = mock_process.call_args[0][0]
+    args = parser.parse_args([])
+    assert args.pre_script == []
+
+
+def test_post_script_argument():
+    """Test -o/--post-script with extend action."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["-o", "cleanup.sh"])
+    assert args.post_script == ["cleanup.sh"]
+
+    args = parser.parse_args(["--post-script", "a.sh", "b.sh"])
+    assert args.post_script == ["a.sh", "b.sh"]
+
+    args = parser.parse_args([])
+    assert args.post_script == []
+
+
+# ===========================
+# Special Argument Tests
+# ===========================
+
+def test_entrypoint_args_remainder():
+    """Test --entrypoint-args captures all remaining arguments."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["--entrypoint-args", "arg1", "arg2", "--flag"])
+    assert args.entrypoint_args == ["arg1", "arg2", "--flag"]
+
+    args = parser.parse_args([])
+    assert args.entrypoint_args == []
+
+
+def test_entrypoint_args_must_be_last():
+    """Test that --entrypoint-args captures everything after it."""
+    parser = cli.create_arg_parser()
+
+    # Everything after --entrypoint-args is captured
+    args = parser.parse_args(["--verbose", "--entrypoint-args", "-w", "test.whl"])
     assert args.verbose is True
+    assert args.entrypoint_args == ["-w", "test.whl"]
+    # wheel won't be parsed because it's after --entrypoint-args
 
 
-def test_main_parses_version_flag(monkeypatch):
-    """Test that --version flag is parsed correctly."""
-    from pychub.package import cli
+# ===========================
+# Combined Arguments Tests
+# ===========================
 
-    mock_process = Mock()
-    monkeypatch.setattr(cli, "process_options", mock_process)
-    monkeypatch.setattr("sys.argv", ["pychub", "pkg.whl", "-v"])
+def test_multiple_arguments_together():
+    """Test parsing multiple arguments together."""
+    parser = cli.create_arg_parser()
 
-    cli.main()
+    args = parser.parse_args([
+        "-w", "pkg.whl",
+        "-c", "output.chub",
+        "-e", "main:run",
+        "--verbose",
+        "-i", "README.md",
+        "-p", "setup.sh",
+        "-m", "author=John"
+    ])
 
-    args = mock_process.call_args[0][0]
-    assert args.version is True
+    assert args.wheel == ["pkg.whl"]
+    assert args.chub == Path("output.chub")
+    assert args.entrypoint == "main:run"
+    assert args.verbose is True
+    assert args.include == ["README.md"]
+    assert args.pre_script == ["setup.sh"]
+    assert args.metadata_entry == ["author=John"]
 
 
-def test_main_dunder_name_guard(monkeypatch):
-    """Test that if __name__ == '__main__' block calls main()."""
-    from pychub.package import cli
+def test_all_defaults():
+    """Test that all arguments have appropriate defaults."""
+    parser = cli.create_arg_parser()
+    args = parser.parse_args([])
 
-    # Track if main was called
-    call_tracker = {"called": False}
-    original_main = cli.main
+    assert args.analyze_compatibility is False
+    assert args.chub is None
+    assert args.chubproject is None
+    assert args.chubproject_save is None
+    assert args.entrypoint is None
+    assert args.entrypoint_args == []
+    assert args.include == []
+    assert args.include_chub == []
+    assert args.metadata_entry is None
+    assert args.post_script == []
+    assert args.pre_script == []
+    assert args.project_path == "."
+    assert args.table is None
+    assert args.verbose is False
+    assert args.version is False
+    assert args.wheel == []
 
-    def mock_main():
-        call_tracker["called"] = True
 
-    # Replace main in the cli module
-    monkeypatch.setattr(cli, "main", mock_main)
+# ===========================
+# Short vs Long Form Tests
+# ===========================
 
-    # Now simulate the if __name__ == "__main__" check
-    # We can't actually re-execute the module, so we just verify
-    # that the guard exists in the source and would call main()
-    import inspect
-    source = inspect.getsource(cli)
+@pytest.mark.parametrize("short,long,value", [
+    ("-c", "--chub", "test.chub"),
+    ("-e", "--entrypoint", "main:run"),
+    ("-i", "--include", "file.txt"),
+    ("-m", "--metadata-entry", "key=val"),
+    ("-o", "--post-script", "post.sh"),
+    ("-p", "--pre-script", "pre.sh"),
+    ("-t", "--table", "custom"),
+    ("-v", "--version", None),
+    ("-w", "--wheel", "pkg.whl"),
+])
+def test_short_and_long_forms_equivalent(short, long, value):
+    """Test that short and long forms produce same results."""
+    parser = cli.create_arg_parser()
 
-    # Verify the guard exists
-    assert 'if __name__ == "__main__"' in source
-    assert 'main()' in source
+    if value:
+        args_short = parser.parse_args([short, value])
+        args_long = parser.parse_args([long, value])
 
-    # Verify main is callable
-    assert callable(original_main)
+        attr_name = long.lstrip("-").replace("-", "_")
+        assert getattr(args_short, attr_name) == getattr(args_long, attr_name)
+    else:
+        # Boolean flags
+        args_short = parser.parse_args([short])
+        args_long = parser.parse_args([long])
+
+        attr_name = long.lstrip("-").replace("-", "_")
+        assert getattr(args_short, attr_name) == getattr(args_long, attr_name) == True
+
+
+# ===========================
+# Edge Cases
+# ===========================
+
+def test_empty_string_values():
+    """Test handling of empty string values."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["-e", ""])
+    assert args.entrypoint == ""
+
+    args = parser.parse_args(["-t", ""])
+    assert args.table == ""
+
+
+def test_path_with_spaces():
+    """Test paths with spaces are handled correctly."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["-c", "path with spaces.chub"])
+    assert args.chub == Path("path with spaces.chub")
+
+
+def test_special_characters_in_strings():
+    """Test special characters in string arguments."""
+    parser = cli.create_arg_parser()
+
+    args = parser.parse_args(["-e", "my_module:my-function"])
+    assert args.entrypoint == "my_module:my-function"
+
+    args = parser.parse_args(["-m", "key=value,with,commas"])
+    assert args.metadata_entry == ["key=value,with,commas"]
