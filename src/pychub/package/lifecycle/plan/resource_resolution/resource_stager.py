@@ -5,12 +5,12 @@ import shutil
 from pathlib import Path, PurePath
 from typing import Union
 
-from pychub.model.build_event import audit
-from pychub.model.buildplan_model import BuildPlan
+from pychub.model.build_event import audit, StageType
 from pychub.model.includes_model import IncludeSpec
 from pychub.package.constants import (
     RUNTIME_DIR
 )
+from pychub.package.context_vars import current_build_plan
 
 _ALLOWED = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -45,10 +45,25 @@ def prefixed_script_names(paths: list[str | Path]) -> list[tuple[Path, str]]:
     return out
 
 
-@audit(stage="PLAN", substage="copy_runtime_files")
-def copy_runtime_files(plan: BuildPlan, runtime_dir: Path) -> None:
+def copy_install_scripts(scripts_dir: Path, script_paths: list[str], script_type: str) -> None:
+    """Copy pre- or post-install scripts into their target directories."""
+    if not script_paths:
+        return
+
+    scripts = prefixed_script_names(script_paths)
+    base = scripts_dir / script_type
+    base.mkdir(parents=True, exist_ok=True)
+    for src_path, dest_name in scripts:
+        src = Path(src_path).expanduser().resolve()
+        if not src.is_file():
+            raise FileNotFoundError(f"{script_type}-install script not found: {src}")
+        shutil.copy2(src, base / dest_name)
+
+
+@audit(stage=StageType.PLAN, substage="copy_runtime_files")
+def copy_runtime_files(runtime_dir: Path) -> None:
     """Copy runtime launcher and `__main__` entry into the build directory."""
-    runtime_src = Path(__file__).resolve().parent.parent.parent / RUNTIME_DIR
+    runtime_src = Path(__file__).resolve().parents[4] / RUNTIME_DIR
     shutil.copytree(runtime_src, runtime_dir, dirs_exist_ok=True)
 
 
@@ -68,9 +83,10 @@ def absolutize_paths(paths: Union[str, list[str]], base_dir: Path) -> Union[str,
     return resolved[0] if is_single else resolved
 
 
-@audit(stage="PLAN", substage="copy_included_files")
-def copy_included_files(plan: BuildPlan, includes_dir: Path, includes: list[IncludeSpec]) -> None:
+@audit(stage=StageType.PLAN, substage="copy_included_files")
+def copy_included_files(includes_dir: Path, includes: list[IncludeSpec]) -> None:
     """Copy arbitrary user-specified include files into the build tree."""
+    build_plan = current_build_plan.get()
     if not includes:
         return
 
@@ -79,9 +95,9 @@ def copy_included_files(plan: BuildPlan, includes_dir: Path, includes: list[Incl
         inc = inc_mod.as_string()
         if "::" in inc:
             src, dest = inc.split("::", 1)
-            included_files.append(f"{absolutize_paths(src, plan.project_dir)}::{dest}")
+            included_files.append(f"{absolutize_paths(src, build_plan.project_dir)}::{dest}")
         else:
-            included_files.append(f"{absolutize_paths(inc, plan.project_dir)}")
+            included_files.append(f"{absolutize_paths(inc, build_plan.project_dir)}")
 
     includes_dir.mkdir(parents=True, exist_ok=True)
 
@@ -96,26 +112,11 @@ def copy_included_files(plan: BuildPlan, includes_dir: Path, includes: list[Incl
         shutil.copy2(src, dest_path)
 
 
-def copy_install_scripts(scripts_dir: Path, script_paths: list[str], script_type: str) -> None:
-    """Copy pre- or post-install scripts into their target directories."""
-    if not script_paths:
-        return
-
-    scripts = prefixed_script_names(script_paths)
-    base = scripts_dir / script_type
-    base.mkdir(parents=True, exist_ok=True)
-    for src_path, dest_name in scripts:
-        src = Path(src_path).expanduser().resolve()
-        if not src.is_file():
-            raise FileNotFoundError(f"{script_type}-install script not found: {src}")
-        shutil.copy2(src, base / dest_name)
-
-
-@audit(stage="PLAN", substage="copy_post_install_scripts")
-def copy_post_install_scripts(plan: BuildPlan, scripts_dir: Path, script_paths: list[str]) -> None:
+@audit(stage=StageType.PLAN, substage="copy_post_install_scripts")
+def copy_post_install_scripts(scripts_dir: Path, script_paths: list[str]) -> None:
     copy_install_scripts(scripts_dir, script_paths, "post")
 
 
-@audit(stage="PLAN", substage="copy_pre_install_scripts")
-def copy_pre_install_scripts(plan: BuildPlan, scripts_dir: Path, script_paths: list[str]) -> None:
+@audit(stage=StageType.PLAN, substage="copy_pre_install_scripts")
+def copy_pre_install_scripts(scripts_dir: Path, script_paths: list[str]) -> None:
     copy_install_scripts(scripts_dir, script_paths, "pre")

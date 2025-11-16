@@ -1,9 +1,10 @@
 import logging
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, call, mock_open
+from unittest.mock import Mock, patch
 
 import pytest
 
+from pychub.package.context_vars import current_build_plan
 from pychub.package.lifecycle.plan.audit.audit_emitter import (
     to_logging_level,
     emit_event,
@@ -240,12 +241,13 @@ def test_emit_audit_log_default_file_destination(mock_configure, mock_emit_all):
     mock_configure.return_value = mock_logger
 
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.staging_dir = Path("/tmp/staging")
     mock_plan.audit_log = [Mock(), Mock()]
 
-    emit_audit_log(mock_plan)
+    emit_audit_log()
 
-    mock_configure.assert_called_once_with([f"file:/tmp/staging/{_LOG_FILE_NAME}"])
+    mock_configure.assert_called_once_with([f"file:{mock_plan.staging_dir}/{mock_plan.project_dir}/{_LOG_FILE_NAME}"])
     mock_emit_all.assert_called_once_with(mock_logger, mock_plan.audit_log, 2)
 
 
@@ -257,11 +259,12 @@ def test_emit_audit_log_custom_file_path(mock_configure, mock_emit_all):
     mock_configure.return_value = mock_logger
 
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.staging_dir = Path("/tmp/staging")
     mock_plan.audit_log = [Mock()]
 
     custom_path = Path("/custom/audit.json")
-    emit_audit_log(mock_plan, dest="file", path=custom_path)
+    emit_audit_log(dest="file", path=custom_path)
 
     # When path is provided, "file" should be passed as-is (not expanded)
     mock_configure.assert_called_once_with(["file"])
@@ -276,10 +279,11 @@ def test_emit_audit_log_stdout_destination(mock_configure, mock_emit_all):
     mock_configure.return_value = mock_logger
 
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.staging_dir = Path("/tmp/staging")
     mock_plan.audit_log = [Mock(), Mock(), Mock()]
 
-    emit_audit_log(mock_plan, dest="stdout")
+    emit_audit_log(dest="stdout")
 
     mock_configure.assert_called_once_with(["stdout"])
     mock_emit_all.assert_called_once_with(mock_logger, mock_plan.audit_log, 2)
@@ -293,10 +297,11 @@ def test_emit_audit_log_multiple_destinations(mock_configure, mock_emit_all):
     mock_configure.return_value = mock_logger
 
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.staging_dir = Path("/tmp/staging")
     mock_plan.audit_log = [Mock()]
 
-    emit_audit_log(mock_plan, dest="stdout stderr")
+    emit_audit_log(dest="stdout stderr")
 
     mock_configure.assert_called_once_with(["stdout", "stderr"])
     mock_emit_all.assert_called_once_with(mock_logger, mock_plan.audit_log, 2)
@@ -310,12 +315,13 @@ def test_emit_audit_log_mixed_destinations_with_file(mock_configure, mock_emit_a
     mock_configure.return_value = mock_logger
 
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.staging_dir = Path("/cache/build")
     mock_plan.audit_log = [Mock(), Mock()]
 
-    emit_audit_log(mock_plan, dest="stdout file stderr")
+    emit_audit_log(dest="stdout file stderr")
 
-    expected_dests = ["stdout", f"file:/cache/build/{_LOG_FILE_NAME}", "stderr"]
+    expected_dests = ["stdout", f"file:/cache/build/{mock_plan.project_dir}/{_LOG_FILE_NAME}", "stderr"]
     mock_configure.assert_called_once_with(expected_dests)
     mock_emit_all.assert_called_once_with(mock_logger, mock_plan.audit_log, 2)
 
@@ -328,10 +334,11 @@ def test_emit_audit_log_custom_indent(mock_configure, mock_emit_all):
     mock_configure.return_value = mock_logger
 
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.staging_dir = Path("/tmp/staging")
     mock_plan.audit_log = [Mock()]
 
-    emit_audit_log(mock_plan, dest="stdout", indent=4)
+    emit_audit_log(dest="stdout", indent=4)
 
     mock_configure.assert_called_once_with(["stdout"])
     mock_emit_all.assert_called_once_with(mock_logger, mock_plan.audit_log, 4)
@@ -345,10 +352,11 @@ def test_emit_audit_log_empty_audit_log(mock_configure, mock_emit_all):
     mock_configure.return_value = mock_logger
 
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.staging_dir = Path("/tmp/staging")
     mock_plan.audit_log = []
 
-    emit_audit_log(mock_plan, dest="stdout")
+    emit_audit_log(dest="stdout")
 
     mock_configure.assert_called_once_with(["stdout"])
     mock_emit_all.assert_called_once_with(mock_logger, [], 2)

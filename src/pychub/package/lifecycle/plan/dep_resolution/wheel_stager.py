@@ -4,8 +4,8 @@ from pathlib import Path
 
 from packaging.utils import canonicalize_name
 
-from pychub.model.build_event import audit, BuildEvent
-from pychub.model.buildplan_model import BuildPlan
+from pychub.model.build_event import audit, BuildEvent, StageType, EventType
+from pychub.package.context_vars import current_build_plan
 from pychub.package.lifecycle.plan.dep_resolution.wheeldeps.wheel_resolution_strategy_base import \
     WheelResolutionStrategy
 
@@ -37,12 +37,12 @@ def _paths(values):
     return out
 
 
-@audit("PLAN", "stage_wheels")
-def stage_wheels(build_plan: BuildPlan,
-                 wheel_files: dict[str, list[str]],
+@audit(StageType.PLAN, "stage_wheels")
+def stage_wheels(wheel_files: dict[str, list[str]],
                  project_wheels: set,
                  strategies: list[WheelResolutionStrategy]):
-    wheels_staging_dir = build_plan.staging_dir / build_plan.wheels_dir
+    build_plan = current_build_plan.get()
+    wheels_staging_dir = build_plan.cache_root / str(build_plan.staged_wheels_dir)
     # iterate over declared deps from the ChubProject
     wheel_paths = _paths(project_wheels)
     for wheel_path in wheel_paths:
@@ -55,9 +55,9 @@ def stage_wheels(build_plan: BuildPlan,
             except Exception as ex:
                 build_plan.audit_log.append(
                     BuildEvent(
-                        stage="PLAN",
+                        stage=StageType.PLAN,
                         substage="stage_wheels",
-                        event_type="EXCEPTION",
+                        event_type=EventType.EXCEPTION,
                         message=f"Failed to resolve {wheel_path} with {strategy.__class__.__name__}: {ex}"))
                 continue
         else:

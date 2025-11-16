@@ -1,10 +1,11 @@
 """Unit tests for resource_stager module."""
 from pathlib import Path, PurePath
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from pychub.model.includes_model import IncludeSpec
+from pychub.package.context_vars import current_build_plan
 from pychub.package.lifecycle.plan.resource_resolution import resource_stager
 
 
@@ -188,7 +189,7 @@ def test_copy_runtime_files_success(mock_copytree, tmp_path):
     mock_plan.audit_log = []
     runtime_dir = tmp_path / "runtime"
 
-    resource_stager.copy_runtime_files(mock_plan, runtime_dir)
+    resource_stager.copy_runtime_files(runtime_dir)
 
     # Verify copytree was called once with dirs_exist_ok=True
     mock_copytree.assert_called_once()
@@ -259,7 +260,7 @@ def test_copy_included_files_empty_list(mock_copy2, tmp_path):
 
     includes_dir = tmp_path / "includes"
 
-    resource_stager.copy_included_files(mock_plan, includes_dir, [])
+    resource_stager.copy_included_files(includes_dir, [])
 
     mock_copy2.assert_not_called()
 
@@ -280,7 +281,7 @@ def test_copy_included_files_single_file(mock_copy2, tmp_path):
     include_spec = Mock(spec=IncludeSpec)
     include_spec.as_string.return_value = str(src_file)
 
-    resource_stager.copy_included_files(mock_plan, includes_dir, [include_spec])
+    resource_stager.copy_included_files(includes_dir, [include_spec])
 
     assert mock_copy2.call_count == 1
     call_args = mock_copy2.call_args[0]
@@ -303,7 +304,7 @@ def test_copy_included_files_with_destination(mock_copy2, tmp_path):
     include_spec = Mock(spec=IncludeSpec)
     include_spec.as_string.return_value = f"{src_file}::custom/dest.txt"
 
-    resource_stager.copy_included_files(mock_plan, includes_dir, [include_spec])
+    resource_stager.copy_included_files(includes_dir, [include_spec])
 
     assert mock_copy2.call_count == 1
     call_args = mock_copy2.call_args[0]
@@ -330,7 +331,7 @@ def test_copy_included_files_multiple_files(mock_copy2, tmp_path):
     spec2 = Mock(spec=IncludeSpec)
     spec2.as_string.return_value = str(src2)
 
-    resource_stager.copy_included_files(mock_plan, includes_dir, [spec1, spec2])
+    resource_stager.copy_included_files(includes_dir, [spec1, spec2])
 
     assert mock_copy2.call_count == 2
 
@@ -350,7 +351,7 @@ def test_copy_included_files_creates_subdirectories(mock_copy2, tmp_path):
     include_spec = Mock(spec=IncludeSpec)
     include_spec.as_string.return_value = f"{src_file}::deep/nested/path/dest.txt"
 
-    resource_stager.copy_included_files(mock_plan, includes_dir, [include_spec])
+    resource_stager.copy_included_files(includes_dir, [include_spec])
 
     # Verify the nested directory was created
     expected_dest = includes_dir / "deep" / "nested" / "path" / "dest.txt"
@@ -369,7 +370,7 @@ def test_copy_included_files_missing_source_raises_error(tmp_path):
     include_spec.as_string.return_value = str(tmp_path / "nonexistent.txt")
 
     with pytest.raises(FileNotFoundError) as exc_info:
-        resource_stager.copy_included_files(mock_plan, includes_dir, [include_spec])
+        resource_stager.copy_included_files(includes_dir, [include_spec])
 
     assert "Included file not found" in str(exc_info.value)
 
@@ -378,6 +379,7 @@ def test_copy_included_files_missing_source_raises_error(tmp_path):
 def test_copy_included_files_relative_path(mock_copy2, tmp_path):
     """Test copy_included_files with relative path."""
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.audit_log = []
     mock_plan.project_dir = tmp_path
 
@@ -389,7 +391,7 @@ def test_copy_included_files_relative_path(mock_copy2, tmp_path):
     include_spec = Mock(spec=IncludeSpec)
     include_spec.as_string.return_value = "source.txt"
 
-    resource_stager.copy_included_files(mock_plan, includes_dir, [include_spec])
+    resource_stager.copy_included_files(includes_dir, [include_spec])
 
     assert mock_copy2.call_count == 1
 
@@ -498,7 +500,7 @@ def test_copy_post_install_scripts_delegates(mock_copy_install, tmp_path):
     scripts_dir = tmp_path / "scripts"
     script_paths = ["script1.sh", "script2.sh"]
 
-    resource_stager.copy_post_install_scripts(mock_plan, scripts_dir, script_paths)
+    resource_stager.copy_post_install_scripts(scripts_dir, script_paths)
 
     mock_copy_install.assert_called_once_with(scripts_dir, script_paths, "post")
 
@@ -511,7 +513,7 @@ def test_copy_post_install_scripts_empty_list(mock_copy_install, tmp_path):
 
     scripts_dir = tmp_path / "scripts"
 
-    resource_stager.copy_post_install_scripts(mock_plan, scripts_dir, [])
+    resource_stager.copy_post_install_scripts(scripts_dir, [])
 
     mock_copy_install.assert_called_once_with(scripts_dir, [], "post")
 
@@ -527,7 +529,7 @@ def test_copy_pre_install_scripts_delegates(mock_copy_install, tmp_path):
     scripts_dir = tmp_path / "scripts"
     script_paths = ["script1.sh", "script2.sh"]
 
-    resource_stager.copy_pre_install_scripts(mock_plan, scripts_dir, script_paths)
+    resource_stager.copy_pre_install_scripts(scripts_dir, script_paths)
 
     mock_copy_install.assert_called_once_with(scripts_dir, script_paths, "pre")
 
@@ -540,7 +542,7 @@ def test_copy_pre_install_scripts_empty_list(mock_copy_install, tmp_path):
 
     scripts_dir = tmp_path / "scripts"
 
-    resource_stager.copy_pre_install_scripts(mock_plan, scripts_dir, [])
+    resource_stager.copy_pre_install_scripts(scripts_dir, [])
 
     mock_copy_install.assert_called_once_with(scripts_dir, [], "pre")
 
@@ -595,6 +597,7 @@ def test_sanitize_integration_with_prefixed_script_names():
 def test_absolutize_paths_integration_with_copy_included_files(mock_copy2, tmp_path):
     """Test that absolutize_paths works correctly within copy_included_files."""
     mock_plan = Mock()
+    current_build_plan.set(mock_plan)
     mock_plan.audit_log = []
     mock_plan.project_dir = tmp_path
 
@@ -607,7 +610,7 @@ def test_absolutize_paths_integration_with_copy_included_files(mock_copy2, tmp_p
     include_spec = Mock(spec=IncludeSpec)
     include_spec.as_string.return_value = "relative.txt"
 
-    resource_stager.copy_included_files(mock_plan, includes_dir, [include_spec])
+    resource_stager.copy_included_files(includes_dir, [include_spec])
 
     # Should successfully resolve and copy
     assert mock_copy2.call_count == 1

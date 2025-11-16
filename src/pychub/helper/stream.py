@@ -1,5 +1,5 @@
-from itertools import islice, tee, groupby
 from functools import reduce as _reduce
+from itertools import islice, tee, groupby
 
 
 class Stream:

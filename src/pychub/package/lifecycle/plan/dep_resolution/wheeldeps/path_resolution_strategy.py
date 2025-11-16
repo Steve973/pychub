@@ -1,14 +1,16 @@
-from pathlib import Path
 import shutil
-from typing import Dict
+from pathlib import Path
 
 from pychub.package.lifecycle.plan.dep_resolution.path_deps_resolver import collect_path_dependencies
-from pychub.package.lifecycle.plan.dep_resolution.wheeldeps.wheel_resolution_strategy_base import WheelResolutionStrategy
+from pychub.package.lifecycle.plan.dep_resolution.wheeldeps.wheel_resolution_strategy_base import \
+    WheelResolutionStrategy
+
 
 class PathResolutionStrategy(WheelResolutionStrategy):
     """Resolves wheels from local path dependencies (Poetry, PDM, Hatch, etc.)."""
 
     name = "path"
+    precedence = 60
 
     def resolve(self, dependency: str, output_dir: Path) -> Path:
         """
@@ -28,7 +30,7 @@ class PathResolutionStrategy(WheelResolutionStrategy):
             raise FileNotFoundError(f"No pyproject.toml found at {pyproject_path}")
 
         # Use your existing recursive collector
-        path_map: Dict[Path, str] = collect_path_dependencies(pyproject_path)
+        path_map: dict[Path, str] = collect_path_dependencies(pyproject_path)
 
         wheel_paths = []
         for proj_path, label in path_map.items():

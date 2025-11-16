@@ -4,16 +4,12 @@ import hashlib
 import re
 import zipfile
 from collections import defaultdict
-from dataclasses import field
+from dataclasses import dataclass, field
 from email.parser import Parser
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
-from typing import TYPE_CHECKING
+from typing import Any, Iterable, Mapping, Optional
 
-if TYPE_CHECKING:
-    from dataclasses import dataclass as dataclass
-else:
-    from .dataclass_shim import dataclass
+from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 
 # --------------------------------------------------------------------------
 # Selectors (case-insensitive). Use "A|B" to mean "prefer A, else B".
@@ -22,9 +18,9 @@ else:
 # --------------------------------------------------------------------------
 # Selector = (alternatives, multi?)
 # Each alternative may be an OR-chain like "License|License-Expression"
-Selector = Tuple[Tuple[str, ...], bool]
+Selector = tuple[tuple[str, ...], bool]
 
-METADATA_SELECTORS: Dict[str, Selector] = {
+METADATA_SELECTORS: dict[str, Selector] = {
     "name": (("Name",), False),
     "version": (("Version",), False),
     "summary": (("Summary",), False),
@@ -35,7 +31,7 @@ METADATA_SELECTORS: Dict[str, Selector] = {
     "home_page": (("Home-page",), False),
 }
 
-WHEEL_SELECTORS: Dict[str, Selector] = {
+WHEEL_SELECTORS: dict[str, Selector] = {
     "wheel_version": (("Wheel-Version",), False),
     "generator": (("Generator",), False),
     "root_is_purelib": (("Root-Is-Purelib",), False),
@@ -48,14 +44,14 @@ _EXTR_RE = re.compile(r"""extra\s*==\s*['"]([^'"]+)['"]""")
 # --------------------------------------------------------------------------
 
 @dataclass(slots=True)
-class SourceInfo:
+class SourceInfo(MultiformatSerializableMixin):
     type: str = "local"  # local | index | vcs | other
     url: Optional[str] = None
     index_url: Optional[str] = None
     downloaded_at: Optional[str] = None  # ISO8601
 
-    def to_mapping(self) -> Dict[str, Any]:
-        m: Dict[str, Any] = {"type": self.type}
+    def to_mapping(self) -> dict[str, Any]:
+        m: dict[str, Any] = {"type": self.type}
         if self.url:
             m["url"] = self.url
         if self.index_url:
@@ -66,11 +62,11 @@ class SourceInfo:
 
 
 @dataclass(slots=True, frozen=True)
-class ExtrasInfo:
+class ExtrasInfo(MultiformatSerializableMixin):
     """
     Mapping of extra name -> list of requirement specs (e.g., {'tests': ['pytest>=7', ...]}).
     """
-    extras: Dict[str, List[str]]
+    extras: dict[str, list[str]]
 
     # ---------- constructors ----------
     @staticmethod
@@ -86,7 +82,7 @@ class ExtrasInfo:
         return ExtrasInfo.from_lists(provides, requires)
 
     @staticmethod
-    def from_mapping(m: Mapping[str, List[str]]) -> "ExtrasInfo":
+    def from_mapping(m: Mapping[str, list[str]]) -> "ExtrasInfo":
         return ExtrasInfo(extras={k: list(v) for k, v in (m or {}).items()})
 
     @staticmethod
@@ -98,8 +94,8 @@ class ExtrasInfo:
         declared = {s.strip() for s in _meta_list(provides_extra) if s and s.strip()}
         reqs = [s.strip() for s in _meta_list(requires_dist) if s and s.strip()]
 
-        grouped: Dict[str, List[str]] = {}
-        buckets: Dict[str, List[str]] = defaultdict(list)
+        grouped: dict[str, list[str]] = {}
+        buckets: dict[str, list[str]] = defaultdict(list)
 
         for r in reqs:
             spec, marker = _split_req_marker(r)
@@ -121,13 +117,13 @@ class ExtrasInfo:
         return ExtrasInfo(extras=grouped)
 
     # ---------- accessors / utils ----------
-    def get(self, name: str) -> List[str]:
+    def get(self, name: str) -> list[str]:
         return list(self.extras.get(name, []))
 
-    def names(self) -> List[str]:
+    def names(self) -> list[str]:
         return list(self.extras.keys())
 
-    def to_mapping(self) -> Dict[str, List[str]]:
+    def to_mapping(self) -> dict[str, list[str]]:
         return {k: list(v) for k, v in self.extras.items()}
 
     def __len__(self) -> int:
@@ -136,23 +132,24 @@ class ExtrasInfo:
     def __bool__(self) -> bool:
         return bool(self.extras)
 
+
 @dataclass(slots=True)
-class WheelInfo:
+class WheelInfo(MultiformatSerializableMixin):
     filename: str
     name: str
     version: str
     size: int
     sha256: str
-    tags: List[str] = field(default_factory=list)        # from WHEEL Tag
+    tags: list[str] = field(default_factory=list)  # from WHEEL Tag
     requires_python: Optional[str] = None
-    deps: List[str] = field(default_factory=list)        # immediate deps (filenames)
+    deps: list[str] = field(default_factory=list)  # immediate deps (filenames)
     extras: ExtrasInfo = field(default_factory=lambda: ExtrasInfo(extras={}))
     source: Optional[SourceInfo] = None
-    meta: Dict[str, Any] = field(default_factory=dict)   # normalized METADATA
-    wheel: Dict[str, Any] = field(default_factory=dict)  # normalized WHEEL
+    meta: dict[str, Any] = field(default_factory=dict)  # normalized METADATA
+    wheel: dict[str, Any] = field(default_factory=dict)  # normalized WHEEL
 
-    def to_mapping(self) -> Dict[str, Any]:
-        out: Dict[str, Any] = {
+    def to_mapping(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
             "name": self.name,
             "version": self.version,
             "sha256": self.sha256,
@@ -245,14 +242,14 @@ def _sha256_file(path: Path, *, chunk: int = 1_048_576) -> str:
 
 
 def _read_headers_from_wheel(
-    path: Path, suffix: str) -> Mapping[str, List[str]]:
+        path: Path, suffix: str) -> Mapping[str, list[str]]:
     with zipfile.ZipFile(path) as z:
         name = next((n for n in z.namelist() if n.endswith(suffix)), None)
         if not name:
             return {}
         text = z.read(name).decode("utf-8", errors="replace")
     msg = Parser().parsestr(text)
-    out: Dict[str, List[str]] = {}
+    out: dict[str, list[str]] = {}
     for k in (msg.keys() or []):
         vals = msg.get_all(k) or []
         out.setdefault(k, []).extend(vals)
@@ -260,13 +257,13 @@ def _read_headers_from_wheel(
 
 
 def _select_fields(
-    headers: Mapping[str, List[str]],
-    selectors: Mapping[str, Selector],) -> Dict[str, object]:
+        headers: Mapping[str, list[str]],
+        selectors: Mapping[str, Selector], ) -> dict[str, object]:
     """Apply OR-able selectors with a built-in multi flag."""
-    ci: Dict[str, List[str]] = {k.lower(): v for k, v in headers.items()}
-    out: Dict[str, object] = {}
+    ci: dict[str, list[str]] = {k.lower(): v for k, v in headers.items()}
+    out: dict[str, object] = {}
     for canon, (alts, multi) in selectors.items():
-        chosen: Optional[List[str]] = None
+        chosen: Optional[list[str]] = None
         for sel in alts:
             for alt in (s.strip() for s in sel.split("|")):
                 vals = ci.get(alt.lower())
@@ -280,8 +277,9 @@ def _select_fields(
         out[canon] = chosen if multi else chosen[0]
     return out
 
-def _select_one(headers: Mapping[str, List[str]], alts: Tuple[str, ...]) -> Optional[str]:
-    ci: Dict[str, List[str]] = {k.lower(): v for k, v in headers.items()}
+
+def _select_one(headers: Mapping[str, list[str]], alts: tuple[str, ...]) -> Optional[str]:
+    ci: dict[str, list[str]] = {k.lower(): v for k, v in headers.items()}
     for sel in alts:
         for alt in (s.strip() for s in sel.split("|")):
             vals = ci.get(alt.lower())
@@ -289,17 +287,20 @@ def _select_one(headers: Mapping[str, List[str]], alts: Tuple[str, ...]) -> Opti
                 return str(vals[0])
     return None
 
-def _meta_list(v: Any) -> List[str]:
+
+def _meta_list(v: Any) -> list[str]:
     if v is None:
         return []
     if isinstance(v, list):
         return [str(x) for x in v]
     return [str(v)]
 
+
 def meta_str(v: Any) -> Optional[str]:
     return None if v is None else str(v)
 
-def _split_req_marker(req: str) -> Tuple[str, Optional[str]]:
+
+def _split_req_marker(req: str) -> tuple[str, Optional[str]]:
     """
     Split 'pkg>=1.2; marker' into ('pkg>=1.2', 'marker'), or ('pkg', None) if no marker.
     """
@@ -308,12 +309,14 @@ def _split_req_marker(req: str) -> Tuple[str, Optional[str]]:
         return spec.strip(), marker.strip()
     return req.strip(), None
 
+
 def _extract_extra_name(marker: Optional[str]) -> Optional[str]:
     if not marker:
         return None
     m = _EXTR_RE.search(marker)
     return m.group(1) if m else None
 
-def _append_dedup(bucket: List[str], item: str) -> None:
+
+def _append_dedup(bucket: list[str], item: str) -> None:
     if item not in bucket:
         bucket.append(item)

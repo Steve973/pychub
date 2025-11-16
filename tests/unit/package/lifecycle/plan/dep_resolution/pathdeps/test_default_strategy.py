@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pychub.package.lifecycle.plan.dep_resolution.pathdeps.default_strategy import DefaultPathDepStrategy
+from pychub.package.lifecycle.plan.dep_resolution.pathdeps.default_path_strategy import DefaultProjectPathStrategy
 
 
 # ============================================================================
@@ -9,7 +9,7 @@ from pychub.package.lifecycle.plan.dep_resolution.pathdeps.default_strategy impo
 
 def test_label_returns_default():
     """Test that label() returns 'Default'."""
-    assert DefaultPathDepStrategy.label() == "Default"
+    assert DefaultProjectPathStrategy.label() == "Default"
 
 
 # ============================================================================
@@ -18,7 +18,7 @@ def test_label_returns_default():
 
 def test_can_handle_always_returns_true():
     """Test can_handle always returns True (fallback strategy)."""
-    assert DefaultPathDepStrategy.can_handle({}) is True
+    assert DefaultProjectPathStrategy.can_handle({}) is True
 
 
 def test_can_handle_with_any_data():
@@ -34,20 +34,20 @@ def test_can_handle_with_any_data():
     ]
 
     for data in test_cases:
-        assert DefaultPathDepStrategy.can_handle(data) is True
+        assert DefaultProjectPathStrategy.can_handle(data) is True
 
 
 def test_can_handle_with_none():
     """Test can_handle returns True even with None."""
-    assert DefaultPathDepStrategy.can_handle(None) is True
+    assert DefaultProjectPathStrategy.can_handle(None) is True
 
 
 def test_can_handle_is_universal_fallback():
     """Test that can_handle is designed as universal fallback."""
     # Should accept literally anything
-    assert DefaultPathDepStrategy.can_handle({"anything": "goes"}) is True
-    assert DefaultPathDepStrategy.can_handle({"": ""}) is True
-    assert DefaultPathDepStrategy.can_handle({"complex": {"nested": {"structure": {}}}}) is True
+    assert DefaultProjectPathStrategy.can_handle({"anything": "goes"}) is True
+    assert DefaultProjectPathStrategy.can_handle({"": ""}) is True
+    assert DefaultProjectPathStrategy.can_handle({"complex": {"nested": {"structure": {}}}}) is True
 
 
 # ============================================================================
@@ -67,7 +67,7 @@ def test_extract_paths_from_dict_style_dependencies(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -85,7 +85,7 @@ def test_extract_paths_from_list_style_dependencies(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -111,7 +111,7 @@ def test_extract_paths_scans_multiple_sections(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 3
     assert lib1.resolve() in paths
     assert lib2.resolve() in paths
@@ -133,7 +133,7 @@ def test_extract_paths_matches_dependencies(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
 
 
@@ -148,7 +148,7 @@ def test_extract_paths_matches_depends(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
 
 
@@ -163,7 +163,7 @@ def test_extract_paths_matches_dependency(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
 
 
@@ -188,7 +188,7 @@ def test_extract_paths_matches_case_insensitive(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 3
 
 
@@ -209,7 +209,7 @@ def test_extract_paths_matches_partial_depend_keyword(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 3
 
 
@@ -223,7 +223,7 @@ def test_extract_paths_ignores_non_depend_keys():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -242,7 +242,7 @@ def test_extract_paths_with_relative_path(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -260,7 +260,7 @@ def test_extract_paths_with_parent_relative_path(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, project_dir)
+    paths = DefaultProjectPathStrategy.extract_paths(data, project_dir)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -275,7 +275,7 @@ def test_extract_paths_with_absolute_path():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert len(paths) == 1
     assert paths[0] == abs_path.resolve()
 
@@ -291,7 +291,7 @@ def test_extract_paths_with_complex_nested_path(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -307,7 +307,7 @@ def test_extract_paths_resolves_to_absolute(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert all(p.is_absolute() for p in paths)
 
 
@@ -331,7 +331,7 @@ def test_extract_paths_with_mixed_dict_and_list(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 2
     assert lib1.resolve() in paths
     assert lib2.resolve() in paths
@@ -345,7 +345,7 @@ def test_extract_paths_ignores_non_dict_non_list_dependencies():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -360,7 +360,7 @@ def test_extract_paths_ignores_string_dependencies():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -380,7 +380,7 @@ def test_extract_paths_mixed_dependency_types(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -398,7 +398,7 @@ def test_extract_paths_with_extras_and_path(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -409,7 +409,7 @@ def test_extract_paths_with_extras_and_path(tmp_path):
 
 def test_extract_paths_with_empty_data():
     """Test extract_paths with completely empty data."""
-    paths = DefaultPathDepStrategy.extract_paths({}, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths({}, Path("/tmp"))
     assert paths == []
 
 
@@ -425,7 +425,7 @@ def test_extract_paths_with_no_dependencies_sections():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -437,7 +437,7 @@ def test_extract_paths_with_empty_dependencies_dict():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -449,7 +449,7 @@ def test_extract_paths_with_empty_dependencies_list():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -463,7 +463,7 @@ def test_extract_paths_with_none_values():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -475,7 +475,7 @@ def test_extract_paths_with_none_sections():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -489,7 +489,7 @@ def test_extract_paths_with_dict_missing_path_key():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -503,7 +503,7 @@ def test_extract_paths_handles_integer_values():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -517,7 +517,7 @@ def test_extract_paths_handles_boolean_values():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -535,7 +535,7 @@ def test_extract_paths_with_nested_dict_not_matching():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -547,7 +547,7 @@ def test_extract_paths_with_empty_path_value(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     # Empty path resolves to project root
     assert paths[0] == tmp_path.resolve()
@@ -575,7 +575,7 @@ def test_extract_paths_scans_nested_sections(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 2
 
 
@@ -589,7 +589,7 @@ def test_extract_paths_only_scans_second_level():
     }
 
     # With the recursive implementation, this WILL be found
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert len(paths) == 1  # Now it finds it!
 
 
@@ -604,12 +604,12 @@ def test_extract_paths_requires_two_level_nesting():
     }
 
     # This SHOULD be found (tool.dependencies)
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert len(paths) == 1
 
 
 # ============================================================================
-# extract_paths() tests - List structures
+# extract_paths() tests - list structures
 # ============================================================================
 
 def test_extract_paths_from_list_with_multiple_items(tmp_path):
@@ -628,7 +628,7 @@ def test_extract_paths_from_list_with_multiple_items(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 2
     assert lib1.resolve() in paths
     assert lib2.resolve() in paths
@@ -647,7 +647,7 @@ def test_extract_paths_from_list_ignores_non_dict_items():
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(data, Path("/tmp"))
     assert paths == []
 
 
@@ -668,7 +668,7 @@ def test_extract_paths_from_list_mixed_items(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -679,13 +679,13 @@ def test_extract_paths_from_list_mixed_items(tmp_path):
 
 def test_strategy_inherits_from_base():
     """Test that DefaultPathDepStrategy inherits from PathDepStrategy."""
-    from pychub.package.lifecycle.plan.dep_resolution.pathdeps.default_strategy import PathDepStrategy
-    assert issubclass(DefaultPathDepStrategy, PathDepStrategy)
+    from pychub.package.lifecycle.plan.dep_resolution.pathdeps.default_path_strategy import ProjectPathStrategy
+    assert issubclass(DefaultProjectPathStrategy, ProjectPathStrategy)
 
 
 def test_strategy_implements_all_abstract_methods():
     """Test that all abstract methods are implemented."""
-    strategy = DefaultPathDepStrategy()
+    strategy = DefaultProjectPathStrategy()
     assert hasattr(strategy, 'label')
     assert hasattr(strategy, 'can_handle')
     assert hasattr(strategy, 'extract_paths')
@@ -708,7 +708,7 @@ def test_extract_paths_preserves_order(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 5
 
 
@@ -723,8 +723,8 @@ def test_extract_paths_multiple_calls_same_data(tmp_path):
         }
     }
 
-    paths1 = DefaultPathDepStrategy.extract_paths(data, tmp_path)
-    paths2 = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths1 = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
+    paths2 = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
 
     assert paths1 == paths2
     assert len(paths1) == 1
@@ -732,14 +732,14 @@ def test_extract_paths_multiple_calls_same_data(tmp_path):
 
 def test_label_is_static():
     """Test that label() can be called without instantiation."""
-    label = DefaultPathDepStrategy.label()
+    label = DefaultProjectPathStrategy.label()
     assert label == "Default"
     assert isinstance(label, str)
 
 
 def test_can_handle_is_static():
     """Test that can_handle() can be called without instantiation."""
-    result = DefaultPathDepStrategy.can_handle({})
+    result = DefaultProjectPathStrategy.can_handle({})
     assert result is True
 
 
@@ -754,7 +754,7 @@ def test_extract_paths_is_static(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -774,7 +774,7 @@ def test_extract_paths_with_duplicate_paths(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     # All three should be extracted
     assert len(paths) == 3
     # They should all resolve to the same absolute path
@@ -792,7 +792,7 @@ def test_extract_paths_with_path_containing_special_chars(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -826,7 +826,7 @@ def test_extract_paths_from_real_world_structures(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 4
     assert all(lib.resolve() in paths for lib in [lib1, lib2, lib3, lib4])
 
@@ -853,7 +853,7 @@ def test_extract_paths_with_deeply_nested_top_level_sections(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     # Should find both because it scans all subkeys at second level
     assert len(paths) == 2
 
@@ -870,7 +870,7 @@ def test_extract_paths_is_truly_universal(tmp_path):
         }
     }
 
-    paths = DefaultPathDepStrategy.extract_paths(data, tmp_path)
+    paths = DefaultProjectPathStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 1
     assert paths[0] == dep_dir.resolve()
 
@@ -889,23 +889,23 @@ def test_can_handle_as_universal_fallback():
     ]
 
     for test_input in test_inputs:
-        assert DefaultPathDepStrategy.can_handle(test_input) is True
+        assert DefaultProjectPathStrategy.can_handle(test_input) is True
 
 
 def test_extract_paths_with_non_dict_input():
     """Test extract_paths with non-dict input (defensive check coverage)."""
     # Test the defensive isinstance check in _scan_all
-    paths = DefaultPathDepStrategy.extract_paths(None, Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths(None, Path("/tmp"))
     assert paths == []
 
 
 def test_extract_paths_with_list_input():
     """Test extract_paths with list input instead of dict."""
-    paths = DefaultPathDepStrategy.extract_paths([{"path": "something"}], Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths([{"path": "something"}], Path("/tmp"))
     assert paths == []
 
 
 def test_extract_paths_with_string_input():
     """Test extract_paths with string input instead of dict."""
-    paths = DefaultPathDepStrategy.extract_paths("not a dict", Path("/tmp"))
+    paths = DefaultProjectPathStrategy.extract_paths("not a dict", Path("/tmp"))
     assert paths == []

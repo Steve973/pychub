@@ -3,7 +3,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from pychub.model.build_event import BuildEvent
+from pychub.model.build_event import StageType, EventType
+from pychub.package.context_vars import current_build_plan
 from pychub.package.lifecycle.plan.dep_resolution import wheel_stager
 
 
@@ -150,6 +151,7 @@ def test_stage_wheels_single_wheel_single_strategy(tmp_path):
     """Test stage_wheels with one wheel and one successful strategy."""
     # Create mock build plan
     build_plan = Mock()
+    current_build_plan.set(build_plan)
     staging_dir = tmp_path / "staging"
     staging_dir.mkdir()
     wheels_dir = Path("wheels")
@@ -171,7 +173,7 @@ def test_stage_wheels_single_wheel_single_strategy(tmp_path):
     wheel_files = {}
     project_wheels = {str(wheel)}
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy])
 
     assert "mypackage" in wheel_files
     assert str(resolved_path) in wheel_files["mypackage"]
@@ -214,7 +216,7 @@ def test_stage_wheels_multiple_wheels(tmp_path, monkeypatch):
 
     mock_event_instance = Mock()
     with patch("pychub.model.build_event.BuildEvent", return_value=mock_event_instance):
-        wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy])
+        wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy])
 
     assert "package1" in wheel_files
     assert "package2" in wheel_files
@@ -225,6 +227,7 @@ def test_stage_wheels_multiple_wheels(tmp_path, monkeypatch):
 def test_stage_wheels_multiple_strategies_first_fails(tmp_path, monkeypatch):
     """Test stage_wheels tries second strategy when first fails."""
     build_plan = Mock()
+    current_build_plan.set(build_plan)
     staging_dir = tmp_path / "staging"
     staging_dir.mkdir()
     wheels_dir = Path("wheels")
@@ -251,7 +254,7 @@ def test_stage_wheels_multiple_strategies_first_fails(tmp_path, monkeypatch):
     wheel_files = {}
     project_wheels = {str(wheel)}
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy1, strategy2])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy1, strategy2])
 
     assert "mypackage" in wheel_files
     assert str(resolved_path) in wheel_files["mypackage"]
@@ -263,9 +266,9 @@ def test_stage_wheels_multiple_strategies_first_fails(tmp_path, monkeypatch):
     # Audit log should contain exception from first strategy
     found_error = False
     for event in build_plan.audit_log:
-        if (event.stage == "PLAN" and
+        if (event.stage == StageType.PLAN and
             event.substage == "stage_wheels" and
-            event.event_type == "EXCEPTION" and
+            event.event_type == EventType.EXCEPTION and
             "Strategy1" in event.message and
             "Strategy1 failed" in event.message and
             "mypackage-1.0.0-py3-none-any.whl" in event.message):
@@ -277,6 +280,7 @@ def test_stage_wheels_multiple_strategies_first_fails(tmp_path, monkeypatch):
 def test_stage_wheels_all_strategies_fail(tmp_path, monkeypatch):
     """Test stage_wheels raises RuntimeError when all strategies fail."""
     build_plan = Mock()
+    current_build_plan.set(build_plan)
     staging_dir = tmp_path / "staging"
     staging_dir.mkdir()
     wheels_dir = Path("wheels")
@@ -302,7 +306,7 @@ def test_stage_wheels_all_strategies_fail(tmp_path, monkeypatch):
     project_wheels = {str(wheel)}
 
     with pytest.raises(RuntimeError) as exc_info:
-        wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy1, strategy2])
+        wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy1, strategy2])
 
     assert "Could not resolve dependency mypackage" in str(exc_info.value)
 
@@ -314,9 +318,9 @@ def test_stage_wheels_all_strategies_fail(tmp_path, monkeypatch):
     found_strategy1 = False
     found_strategy2 = False
     for event in build_plan.audit_log:
-        if (event.stage == "PLAN" and
+        if (event.stage == StageType.PLAN and
                 event.substage == "stage_wheels" and
-                event.event_type == "EXCEPTION"):
+                event.event_type == EventType.EXCEPTION):
             if "Strategy1" in event.message and "Strategy1 failed" in event.message:
                 found_strategy1 = True
             if "Strategy2" in event.message and "Strategy2 failed" in event.message:
@@ -349,7 +353,7 @@ def test_stage_wheels_canonicalizes_package_name(tmp_path):
     wheel_files = {}
     project_wheels = {str(wheel)}
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy])
 
     # Should be canonicalized to lowercase with hyphens
     assert "my-package" in wheel_files
@@ -378,7 +382,7 @@ def test_stage_wheels_appends_to_existing_wheel_files(tmp_path):
     wheel_files = {"mypackage": ["existing-wheel.whl"]}
     project_wheels = {str(wheel)}
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy])
 
     # Should append, not replace
     assert len(wheel_files["mypackage"]) == 2
@@ -402,7 +406,7 @@ def test_stage_wheels_empty_project_wheels(tmp_path):
     wheel_files = {}
     project_wheels = set()
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy])
 
     # Should complete without error
     assert wheel_files == {}
@@ -434,7 +438,7 @@ def test_stage_wheels_filters_nonexistent_wheels(tmp_path):
 
     project_wheels = {str(existing_wheel), nonexistent_wheel}
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy])
 
     # Only existing wheel should be processed
     assert "exists" in wheel_files
@@ -444,6 +448,7 @@ def test_stage_wheels_filters_nonexistent_wheels(tmp_path):
 def test_stage_wheels_strategy_exception_details_in_audit_log(tmp_path, monkeypatch):
     """Test that exception details are properly logged in audit_log."""
     build_plan = Mock()
+    current_build_plan.set(build_plan)
     staging_dir = tmp_path / "staging"
     staging_dir.mkdir()
     wheels_dir = Path("wheels")
@@ -469,14 +474,14 @@ def test_stage_wheels_strategy_exception_details_in_audit_log(tmp_path, monkeypa
     wheel_files = {}
     project_wheels = {str(wheel)}
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy1, strategy2])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy1, strategy2])
 
     # Check audit log details
     found_error = False
     for event in build_plan.audit_log:
-        if (event.stage == "PLAN" and
+        if (event.stage == StageType.PLAN and
                 event.substage == "stage_wheels" and
-                event.event_type == "EXCEPTION" and
+                event.event_type == EventType.EXCEPTION and
                 "TestStrategy" in event.message and
                 "Invalid wheel format" in event.message and
                 "mypackage-1.0.0-py3-none-any.whl" in event.message):
@@ -512,7 +517,7 @@ def test_stage_wheels_breaks_on_first_successful_strategy(tmp_path, monkeypatch)
     wheel_files = {}
     project_wheels = {str(wheel)}
 
-    wheel_stager.stage_wheels(build_plan, wheel_files, project_wheels, [strategy1, strategy2])
+    wheel_stager.stage_wheels(wheel_files, project_wheels, [strategy1, strategy2])
 
     # Only first strategy should be called
     strategy1.resolve.assert_called_once()

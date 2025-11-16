@@ -358,8 +358,8 @@ def test_extract_paths_with_optional_dependencies(tmp_path):
 
 def test_strategy_inherits_from_base():
     """Test that HatchPathDepStrategy inherits from PathDepStrategy."""
-    from pychub.package.lifecycle.plan.dep_resolution.pathdeps.path_dep_strategy_base import PathDepStrategy
-    assert issubclass(HatchPathDepStrategy, PathDepStrategy)
+    from pychub.package.lifecycle.plan.dep_resolution.pathdeps.project_path_strategy_base import ProjectPathStrategy
+    assert issubclass(HatchPathDepStrategy, ProjectPathStrategy)
 
 
 def test_strategy_implements_all_abstract_methods():
@@ -414,7 +414,7 @@ def test_extract_paths_preserves_order(tmp_path):
 
     paths = HatchPathDepStrategy.extract_paths(data, tmp_path)
     assert len(paths) == 5
-    # List order is always preserved
+    # list order is always preserved
 
 
 def test_extract_paths_with_complex_nested_path(tmp_path):

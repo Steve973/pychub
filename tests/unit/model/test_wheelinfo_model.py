@@ -4,7 +4,7 @@ import json
 import re
 from email.parser import Parser
 from importlib import resources
-from typing import Any, Dict, List, Mapping
+from typing import Any, Mapping
 
 import pytest
 
@@ -14,15 +14,15 @@ from pychub.model.wheelinfo_model import WheelInfo, ExtrasInfo, SourceInfo
 
 EXTRA_RE = re.compile(r"""extra\s*==\s*['"]([^'"]+)['"]""")
 
-def parse_metadata_text_to_dict(text: str) -> Dict[str, Any]:
+def parse_metadata_text_to_dict(text: str) -> dict[str, Any]:
     """Turn RFC822 METADATA text into the dict shape your code expects."""
     msg = Parser().parsestr(text)
 
-    def many(name: str) -> List[str]:
+    def many(name: str) -> list[str]:
         vals = msg.get_all(name) or []
         return [v.strip() for v in vals if v and v.strip()]
 
-    meta: Dict[str, Any] = {
+    meta: dict[str, Any] = {
         "name": msg.get("Name"),
         "version": msg.get("Version"),
         "requires_python": msg.get("Requires-Python"),
@@ -32,12 +32,12 @@ def parse_metadata_text_to_dict(text: str) -> Dict[str, Any]:
     # drop Nones
     return {k: v for k, v in meta.items() if v is not None}
 
-def expected_extras_from_text(text: str) -> Dict[str, List[str]]:
+def expected_extras_from_text(text: str) -> dict[str, list[str]]:
     """
     Compute the expected {extra: [spec,...]} mapping directly from raw METADATA text,
     by reading Requires-Dist lines and extracting the 'extra == "..."' markers.
     """
-    expected: Dict[str, List[str]] = {}
+    expected: dict[str, list[str]] = {}
     for line in text.splitlines():
         if not line.startswith("Requires-Dist:"):
             continue
@@ -71,7 +71,7 @@ def metadata_text() -> str:
         return f.read()
 
 @pytest.fixture(scope="module")
-def metadata_dict(metadata_text: str) -> Dict[str, Any]:
+def metadata_dict(metadata_text: str) -> dict[str, Any]:
     return parse_metadata_text_to_dict(metadata_text)
 
 

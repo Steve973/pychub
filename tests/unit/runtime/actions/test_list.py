@@ -233,14 +233,14 @@ def test_list_wheels_with_config_but_produces_empty_lines(monkeypatch, tmp_path,
     # but doesn't produce any output lines
 
     # Create a minimal truthy wheels object that won't produce lines
-    class EmptyWheelsDict(dict):
+    class EmptyWheelsdict(dict):
         def __bool__(self):
             return True  # Truthy
 
         def items(self):
             return []  # But produces no items
 
-    cfg = SimpleNamespace(wheels=EmptyWheelsDict())
+    cfg = SimpleNamespace(wheels=EmptyWheelsdict())
     monkeypatch.setattr(list_action, "load_chubconfig", lambda root: cfg)
 
     list_action.list_wheels(tmp_path)

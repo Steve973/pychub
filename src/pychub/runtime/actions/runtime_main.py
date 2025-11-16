@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
 import shutil
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -11,8 +11,8 @@ from .chubconfig import load_chubconfig
 from .discover import discover_wheels
 from .entrypoint import _run_entrypoint_with_python
 from .install import install_wheels
-from .list import list_wheels
 from .install_hooks import run_post_install_scripts, run_pre_install_scripts
+from .list import list_wheels
 from .unpack import unpack_chub
 from .venv import create_venv, _venv_python
 from .version import show_version

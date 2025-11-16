@@ -6,8 +6,7 @@ from pathlib import Path
 
 from packaging.utils import parse_wheel_filename
 
-from pychub.model.build_event import audit
-from pychub.model.buildplan_model import BuildPlan
+from pychub.model.build_event import audit, StageType
 from pychub.model.chubconfig_model import ChubConfig
 from pychub.package.constants import (
     CHUB_BUILD_DIR,
@@ -16,28 +15,29 @@ from pychub.package.constants import (
     CHUB_BUILD_DIR_STRUCTURE,
     CHUB_SCRIPTS_DIR, CHUB_INCLUDES_DIR, RUNTIME_DIR,
 )
+from pychub.package.context_vars import current_build_plan
 
 
-@audit(stage="EXECUTE", substage="write_chubconfig_file")
+@audit(stage=StageType.EXECUTE, substage="write_chubconfig_file")
 def write_chubconfig_file(
-        plan: BuildPlan,
         dist_name: str,
         dist_ver: str,
         pinned_wheels: list[str],
         targets: list[str],
         chub_build_dir: Path) -> None:
+    build_plan = current_build_plan.get()
     chubconfig_model = ChubConfig.from_mapping({
         "name": dist_name,
         "version": dist_ver,
-        "entrypoint": plan.project.entrypoint,
-        "includes": plan.project.includes or [],
+        "entrypoint": build_plan.project.entrypoint,
+        "includes": build_plan.project.includes or [],
         "scripts": {
-            "pre": [n for _, n in plan.project.scripts.pre],
-            "post": [n for _, n in plan.project.scripts.post]
+            "pre": [n for _, n in build_plan.project.scripts.pre],
+            "post": [n for _, n in build_plan.project.scripts.post]
         },
         "pinned_wheels": pinned_wheels,
         "compatibility": {"targets": targets},
-        "metadata": plan.project.metadata
+        "metadata": build_plan.project.metadata
     })
     chubconfig_model.validate()
     chubconfig_file = Path(chub_build_dir / CHUBCONFIG_FILENAME).resolve()
@@ -101,29 +101,32 @@ def prepare_build_dirs(main_wheel_path: Path, chub_path: Path | None) -> tuple[P
     return chub_build_dir, wheel_libs_dir, path_cache_dir
 
 
-@audit(stage="EXECUTE", substage="copy_runtime_files")
-def copy_runtime_files(plan: BuildPlan, runtime_files_dest_dir: Path) -> None:
+@audit(stage=StageType.EXECUTE, substage="copy_runtime_files")
+def copy_runtime_files(runtime_files_dest_dir: Path) -> None:
     """Copy runtime launcher and `__main__` entry into the build directory."""
-    staged_runtime_files_dir = plan.staging_dir / RUNTIME_DIR
+    build_plan = current_build_plan.get()
+    staged_runtime_files_dir = build_plan.cache_root / RUNTIME_DIR
     shutil.copytree(staged_runtime_files_dir, runtime_files_dest_dir, dirs_exist_ok=True)
 
 
-@audit(stage="EXECUTE", substage="copy_included_files")
-def copy_included_files(plan: BuildPlan, includes_dest_dir: Path) -> None:
+@audit(stage=StageType.EXECUTE, substage="copy_included_files")
+def copy_included_files(includes_dest_dir: Path) -> None:
     """Copy arbitrary user-specified include files into the build tree."""
-    staged_includes_dir = plan.staging_dir / CHUB_INCLUDES_DIR
+    build_plan = current_build_plan.get()
+    staged_includes_dir = build_plan.cache_root / CHUB_INCLUDES_DIR
     shutil.copytree(staged_includes_dir, includes_dest_dir, dirs_exist_ok=True)
 
 
-@audit(stage="EXECUTE", substage="copy_install_scripts")
-def copy_install_scripts(plan: BuildPlan, scripts_dest_dir: Path) -> None:
+@audit(stage=StageType.EXECUTE, substage="copy_install_scripts")
+def copy_install_scripts(scripts_dest_dir: Path) -> None:
     """Copy pre- or post-install scripts into their target directories."""
-    staged_scripts_dir = plan.staging_dir / CHUB_SCRIPTS_DIR
+    build_plan = current_build_plan.get()
+    staged_scripts_dir = build_plan.cache_root / CHUB_SCRIPTS_DIR
     shutil.copytree(staged_scripts_dir, scripts_dest_dir, dirs_exist_ok=True)
 
 
-@audit(stage="EXECUTE", substage="create_chub_archive")
-def create_chub_archive(plan: BuildPlan, chub_build_dir: Path, chub_archive_path: Path) -> Path:
+@audit(stage=StageType.EXECUTE, substage="create_chub_archive")
+def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
     """Create a ZIP-based .chub archive."""
     with zipfile.ZipFile(chub_archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for file_path in sorted(chub_build_dir.rglob("*"), key=lambda p: p.relative_to(chub_build_dir).as_posix()):
@@ -134,16 +137,17 @@ def create_chub_archive(plan: BuildPlan, chub_build_dir: Path, chub_archive_path
     return chub_archive_path
 
 
-@audit(stage="EXECUTE", substage="bundle_chub")
-def bundle_chub(plan: BuildPlan) -> Path:
+@audit(stage=StageType.EXECUTE, substage="bundle_chub")
+def bundle_chub() -> Path:
     """Bundle the final .chub archive using the prepared BuildPlan."""
-    build_dir = plan.staging_dir / CHUB_BUILD_DIR
+    build_plan = current_build_plan.get()
+    build_dir = build_plan.cache_root / CHUB_BUILD_DIR
     build_dir.mkdir(parents=True, exist_ok=True)
     libs_dir = build_dir / CHUB_LIBS_DIR
     libs_dir.mkdir(exist_ok=True)
 
-    # Copy staged wheels from plan.wheels_dir
-    staged_wheels_root = plan.staging_dir / plan.wheels_dir
+    # Copy staged wheels from the plan's staged wheels dir
+    staged_wheels_root = build_plan.staged_wheels_dir
     if not staged_wheels_root.exists():
         raise FileNotFoundError(f"Missing staged wheels: {staged_wheels_root}")
 
@@ -151,28 +155,29 @@ def bundle_chub(plan: BuildPlan) -> Path:
         shutil.copy2(wheel_path, libs_dir / wheel_path.name)
 
     # Determine primary dist info
-    wheels = plan.project.wheels
-    if plan.project.name and plan.project.version:
-        dist_name = plan.project.name
-        dist_ver = plan.project.version
-    elif plan.project.wheels and len(plan.project.wheels) >= 1:
+    project = build_plan.project
+    wheels = project.wheels
+    if project.name and project.version:
+        dist_name = project.name
+        dist_ver = project.version
+    elif project.wheels and len(project.wheels) >= 1:
         dist_name, dist_ver, *_ = parse_wheel_filename(wheels[0])
     else:
         raise ValueError("Missing distribution name and version")
 
     # Copy additional assets
-    copy_runtime_files(plan, build_dir / RUNTIME_DIR)
-    copy_included_files(plan, build_dir / CHUB_INCLUDES_DIR)
-    copy_install_scripts(plan, build_dir / CHUB_SCRIPTS_DIR)
+    copy_runtime_files(build_dir / RUNTIME_DIR)
+    copy_included_files(build_dir / CHUB_INCLUDES_DIR)
+    copy_install_scripts(build_dir / CHUB_SCRIPTS_DIR)
 
     # Write config
     wheels_and_versions = [f"{name}=={ver}" for wheel in wheels for name, ver, *_ in [parse_wheel_filename(wheel)]]
     targets = [p.name for p in staged_wheels_root.iterdir() if p.is_dir()]
-    write_chubconfig_file(plan, dist_name, dist_ver, wheels_and_versions, targets, build_dir)
+    write_chubconfig_file(dist_name, dist_ver, wheels_and_versions, targets, build_dir)
 
     # Assemble .chub archive
-    output_path = plan.project.chub or (build_dir / f"{dist_name}-{dist_ver}.chub")
-    output_path = create_chub_archive(plan, build_dir, Path(output_path))
+    output_path = build_plan.project.chub or (build_dir / f"{dist_name}-{dist_ver}.chub")
+    output_path = create_chub_archive(build_dir, Path(output_path))
 
     print(f"Built {output_path}")
     return output_path

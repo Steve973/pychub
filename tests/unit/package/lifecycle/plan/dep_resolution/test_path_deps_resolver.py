@@ -8,6 +8,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from pychub.helper.toml_utils import dump_toml_to_str
+
 
 # Test fixtures
 
@@ -17,12 +19,8 @@ def mock_pyproject_toml():
 
     def _factory(content_dict: dict) -> bytes:
         """Convert dict to TOML bytes for mocking file read."""
-        import io
         try:
-            import tomli_w
-            buffer = io.BytesIO()
-            tomli_w.dump(content_dict, buffer)
-            return buffer.getvalue()
+            return dump_toml_to_str(content_dict).encode('utf-8')
         except ImportError:
             # Fallback: simple TOML serialization for tests
             lines = []
@@ -546,7 +544,7 @@ def test_collect_path_dependencies_label_formatting(tmp_path, capsys):
 
 # Test: Return value structure
 def test_collect_path_dependencies_return_value_structure(tmp_path, mock_strategy_class):
-    """Test that the return value has the correct structure (Dict[Path, str])."""
+    """Test that the return value has the correct structure (dict[Path, str])."""
     # Arrange
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text("[tool.poetry]\nname = \"test\"\n")

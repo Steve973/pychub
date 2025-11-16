@@ -10,6 +10,41 @@ from pychub.model.includes_model import IncludeSpec
 from pychub.model.scripts_model import Scripts
 
 
+# ===========================
+# project_hash tests
+# ===========================
+
+def test_project_hash_generates_16_char_hash():
+    """Test that project_hash generates a 16-character hash."""
+    chubproject = ChubProject(name="test", version="1.0.0")
+    result = chubproject.project_hash()
+
+    assert len(result) == 16
+    assert result.isalnum()
+
+
+def test_project_hash_is_deterministic():
+    """Test that project_hash produces the same hash for the same data."""
+    chubproject1 = ChubProject(name="test", version="1.0.0")
+    chubproject2 = ChubProject(name="test", version="1.0.0")
+
+    hash1 = chubproject1.project_hash()
+    hash2 = chubproject2.project_hash()
+
+    assert hash1 == hash2
+
+
+def test_project_hash_differs_for_different_data():
+    """Test that project_hash produces different hashes for different data."""
+    chubproject1 = ChubProject(name="test1", version="1.0.0")
+    chubproject2 = ChubProject(name="test2", version="1.0.0")
+
+    hash1 = chubproject1.project_hash()
+    hash2 = chubproject2.project_hash()
+
+    assert hash1 != hash2
+
+
 # ============================================================
 # Test get_wheel_name_version function (mocking zipfile)
 # ============================================================
@@ -79,7 +114,7 @@ def test_from_mapping_minimal():
     """Minimal mapping should create ChubProject with defaults."""
     with patch("pychub.model.chubproject_model.get_wheel_name_version", return_value=("test-pkg", "1.0.0")):
         with patch("pychub.model.chubproject_model.os.getcwd", return_value="/fake/cwd"):
-            mapping = {"wheel": ["/fake/test.whl"]}
+            mapping = {"wheels": ["/fake/test.whl"]}
             proj = ChubProject.from_mapping(mapping)
 
             assert proj.wheels == ["/fake/test.whl"]
@@ -91,7 +126,7 @@ def test_from_mapping_complete():
     """Complete mapping with all fields should populate ChubProject."""
     with patch("pychub.model.chubproject_model.get_wheel_name_version", return_value=("test-pkg", "1.0.0")):
         mapping = {
-            "wheel": ["/fake/test.whl", "extra.whl"],
+            "wheels": ["/fake/test.whl", "extra.whl"],
             "chub": "output.chub",
             "entrypoint": "main:run",
             "includes": ["src/data.txt", "src/config.yaml::config/config.yaml"],
@@ -461,7 +496,7 @@ def test_flatten_nested_list():
 
 
 def test_dedup_with_duplicates():
-    """List with duplicates should have duplicates removed."""
+    """list with duplicates should have duplicates removed."""
     assert ChubProject._dedup(["a", "b", "a", "c", "b"]) == ["a", "b", "c"]
 
 
@@ -559,7 +594,7 @@ def test_chubproject_has_slots():
 def test_from_mapping_with_wheel_extraction():
     """Test that from_mapping calls get_wheel_name_version properly."""
     with patch("pychub.model.chubproject_model.get_wheel_name_version", return_value=("pkg", "2.0")) as mock_get:
-        mapping = {"wheel": ["/fake/wheel.whl"]}
+        mapping = {"wheels": ["/fake/wheel.whl"]}
         proj = ChubProject.from_mapping(mapping)
 
         mock_get.assert_called_once()

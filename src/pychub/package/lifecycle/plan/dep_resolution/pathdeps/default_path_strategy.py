@@ -1,22 +1,20 @@
 from pathlib import Path
-from typing import List
 
-from pychub.package.lifecycle.plan.dep_resolution.pathdeps import PathDepStrategy
+from .project_path_strategy_base import ProjectPathStrategy
 
 
-class DefaultPathDepStrategy(PathDepStrategy):
-    """Fallback: scan all dicts for keys matching *depend* (but don't recurse into values of those keys)."""
+class DefaultProjectPathStrategy(ProjectPathStrategy):
+    """Fallback: scan all dicts for keys containing 'depend' (but don't recurse into values of those keys)."""
 
-    @staticmethod
-    def label() -> str:
-        return "Default"
+    name = "default"
+    precedence = 1000
 
     @staticmethod
     def can_handle(data: dict) -> bool:
         return True
 
     @staticmethod
-    def extract_paths(data: dict, project_root: Path) -> List[Path]:
+    def extract_paths(data: dict, project_root: Path) -> list[Path]:
         out = []
 
         def _extract_from_deps(deps_section):

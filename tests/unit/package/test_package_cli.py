@@ -150,7 +150,7 @@ def test_project_path_argument():
 
 
 # ===========================
-# List/Extend Action Tests
+# list/Extend Action Tests
 # ===========================
 
 def test_wheel_argument_single():

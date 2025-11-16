@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+
 class WheelResolutionStrategy(ABC):
     """Resolve a dependency to a wheel file, downloading or copying as needed."""
 
     name: str
+    precedence: int = 100  # lower value = higher precedence
 
     @abstractmethod
     def resolve(self, dependency: str, output_dir: Path) -> Path:

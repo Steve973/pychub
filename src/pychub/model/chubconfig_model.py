@@ -1,32 +1,25 @@
 from __future__ import annotations
 
-import json
-from dataclasses import field
+from dataclasses import dataclass, field
 from pathlib import Path
-from pickle import compatible_formats
-from typing import Any, Dict, List, Mapping, Optional
-from typing import TYPE_CHECKING
+from typing import Any, Mapping, Optional
 
 import yaml
 
 from pychub.model.scripts_model import Scripts
-
-if TYPE_CHECKING:
-    from dataclasses import dataclass as dataclass
-else:
-    from .dataclass_shim import dataclass
+from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 
 
 @dataclass(slots=True, frozen=True)
-class ChubConfig:
+class ChubConfig(MultiformatSerializableMixin):
     name: str
     version: str
     entrypoint: Optional[str] = None
-    includes: List[str] = field(default_factory=list)
+    includes: list[str] = field(default_factory=list)
     scripts: Scripts = field(default_factory=Scripts)
-    pinned_wheels: List[str] = field(default_factory=list)
-    targets: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    pinned_wheels: list[str] = field(default_factory=list)
+    targets: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def from_mapping(m: Mapping[str, Any]) -> "ChubConfig":
@@ -64,7 +57,7 @@ class ChubConfig:
         text = p.read_text(encoding="utf-8")
         return cls.from_yaml(text)
 
-    def to_mapping(self) -> Dict[str, Any]:
+    def to_mapping(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "version": self.version,
@@ -75,14 +68,6 @@ class ChubConfig:
             "targets": list(self.targets),
             "metadata": dict(self.metadata),
         }
-
-    def to_json(self, *, indent: int = 2) -> str:
-        return json.dumps(self.to_mapping(), ensure_ascii=False, indent=indent)
-
-    def to_yaml(self) -> str:
-        if yaml is None:
-            raise RuntimeError("PyYAML not installed")
-        return yaml.safe_dump(self.to_mapping(), sort_keys=False, allow_unicode=True)
 
     def validate(self) -> None:
         if not self.name:

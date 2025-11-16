@@ -12,7 +12,7 @@ def _print_lines(lines: Iterable[str]) -> None:
 
 
 def list_wheels(bundle_root: Path, *, quiet: bool = False, verbose: bool = False) -> None:
-    """List bundled wheels from .chubconfig (preferred) or libs/ fallback.
+    """list bundled wheels from .chubconfig (preferred) or libs/ fallback.
 
     Output contract (simple, stable):
     - Each top-level wheel on its own line ending with ':'
@@ -27,7 +27,7 @@ def list_wheels(bundle_root: Path, *, quiet: bool = False, verbose: bool = False
     if cfg and cfg.wheels:
         lines: list[str] = []
         if quiet:
-           for wheel, deps in cfg.wheels.items():
+            for wheel, deps in cfg.wheels.items():
                 lines.append(f"w:{wheel}, d:{len(deps)}")
         else:
             for wheel, deps in cfg.wheels.items():  # preserves insertion order

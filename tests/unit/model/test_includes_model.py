@@ -191,9 +191,9 @@ def test_to_mapping_roundtrip_with_dest():
 
 def test_parse_handles_dict_like_objects():
     """Parse should work with any Mapping, not just dict."""
-    from collections import OrderedDict
+    from collections import Ordereddict
 
-    spec = IncludeSpec.parse(OrderedDict([("src", "file.txt"), ("dest", "out.txt")]))
+    spec = IncludeSpec.parse(Ordereddict([("src", "file.txt"), ("dest", "out.txt")]))
     assert spec.src == "file.txt"
     assert spec.dest == "out.txt"
 

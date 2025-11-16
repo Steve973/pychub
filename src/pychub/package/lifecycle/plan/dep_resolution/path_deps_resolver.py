@@ -1,23 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
 
-from pychub.package.lifecycle.plan.dep_resolution.pathdeps import load_strategies
-from pychub.package.lifecycle.plan.dep_resolution.pathdeps.path_dep_strategy_base import PathDepStrategy
-
-# --- reader: tomllib on 3.11+, tomli on 3.9–3.10 ---
-try:  # pragma: no cover
-    # noinspection PyCompatibility
-    import tomllib  # Python 3.11+
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib  # type: ignore
+from pychub.helper.toml_utils import load_toml_file
+from pychub.package.lifecycle.plan.dep_resolution.pathdeps.project_path_strategy_base import ProjectPathStrategy
+from pychub.package.lifecycle.plan.dep_resolution.pathdeps.project_path_strategy_registry import \
+    load_strategies
 
 
 def collect_path_dependencies(
-    pyproject_path: Path,
-    seen: Dict[Path, str] | None = None,
-    depth: int = 0) -> Dict[Path, str]:
+        pyproject_path: Path,
+        seen: dict[Path, str] | None = None,
+        depth: int = 0) -> dict[Path, str]:
     """
     Recursively collect all project roots for path dependencies, mapped to
     the strategy label that handled them (e.g. "Poetry", "Hatch", "PDM", "Default").
@@ -31,16 +25,15 @@ def collect_path_dependencies(
     if project_root in seen:
         return seen
 
-    with pyproject_path.open("rb") as f:
-        data = tomllib.load(f)
+    data = load_toml_file(pyproject_path)
 
-    strategies: List[PathDepStrategy] = load_strategies()
+    strategies: list[ProjectPathStrategy] = load_strategies()
     claimed = [s for s in strategies if s.can_handle(data)]
 
     if not claimed:
         # fallback to Default (import here to avoid circular import)
-        from pychub.package.lifecycle.plan.dep_resolution.pathdeps.default_strategy import DefaultPathDepStrategy
-        strat: PathDepStrategy = DefaultPathDepStrategy()
+        from pychub.package.lifecycle.plan.dep_resolution.pathdeps.default_path_strategy import DefaultProjectPathStrategy
+        strat: ProjectPathStrategy = DefaultProjectPathStrategy()
     elif len(claimed) > 1:
         raise RuntimeError(f"Multiple strategies matched {project_root}")
     else:
@@ -50,7 +43,7 @@ def collect_path_dependencies(
     seen[project_root] = label
 
     dep_paths = strat.extract_paths(data, project_root)
-    print(f"{'  '*depth}[{label:<6}] {project_root.name} -> {len(dep_paths)} deps")
+    print(f"{'  ' * depth}[{label:<6}] {project_root.name} -> {len(dep_paths)} deps")
 
     for dep_path in dep_paths:
         dep_py = dep_path / "pyproject.toml"

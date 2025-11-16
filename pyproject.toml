@@ -7,7 +7,7 @@ name = "pychub"
 version = "2.0.0"
 description = "Make a Python-native .chub installer from wheels and their dependencies."
 readme = "README.md"
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.10,<4.0"
 license = { file = "LICENSE" }
 authors = [
     { name = "Steve Storck", email = "steve973@gmail.com" }
@@ -22,7 +22,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -74,12 +73,16 @@ packaging = ">=25.0"
 pyyaml = ">=6.0.3"
 requests = ">=2.32.5"
 #spdx-tools = ">=0.8.3"
-tomli = { version = ">=2.2", markers = "python_version < '3.11'" }
+tomli = ">=2.3.0"
 tomli-w = ">=1.2.0"
 
 [tool.poetry.group.dev.dependencies]
+build = ">=1.3.0"
+mypy = ">=1.18.2"
+poetry = ">=2.2.1"
 pytest = ">=8.4.1"
 pytest-cov = ">=7.0.0"
+ruff = ">=0.14.5"
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "-q", "--import-mode=importlib"]
@@ -88,3 +91,29 @@ python_files = ["test_*.py"]
 markers = [
     "integration: marks tests as integration (deselect with '-m \"not integration\"')"
 ]
+
+[tool.ruff]
+# Treat these as your source roots
+src = ["src", "tests"]
+
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Start conservative, adjust as you like
+select = ["E", "F", "W"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+namespace_packages = true
+strict_optional = true
+pretty = true
+show_error_codes = true
+
+# Tune as you go
+warn_unused_ignores = true
+warn_return_any = true
+check_untyped_defs = true
+

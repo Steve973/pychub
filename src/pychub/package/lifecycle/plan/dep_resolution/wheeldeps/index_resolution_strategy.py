@@ -1,23 +1,25 @@
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
 
 import requests
 from packaging.requirements import Requirement
 from packaging.version import Version, InvalidVersion
 
-from pychub.package.lifecycle.plan.dep_resolution.wheeldeps.wheel_resolution_strategy_base import WheelResolutionStrategy
+from pychub.package.lifecycle.plan.dep_resolution.wheeldeps.wheel_resolution_strategy_base import \
+    WheelResolutionStrategy
 
 
 class IndexResolutionStrategy(WheelResolutionStrategy):
     """Resolve all wheel variants of a dependency from a PyPI-style index."""
+
     name = "index"
+    precedence = 70
 
     @staticmethod
     def fetch_all_wheel_variant_urls(
-        requirement: str,
-        index_url: str = "https://pypi.org/pypi") -> List[str]:
+            requirement: str,
+            index_url: str = "https://pypi.org/pypi") -> list[str]:
         """
         Given a requirement (e.g. 'torch==2.2.0'), fetch all matching wheel URLs
         from the specified index. If no version constraint is given, fetch the latest release.
@@ -48,7 +50,7 @@ class IndexResolutionStrategy(WheelResolutionStrategy):
             }
 
         # Collect all wheel URLs across those releases
-        wheel_urls: List[str] = []
+        wheel_urls: list[str] = []
         for ver, files in releases.items():
             for f in files:
                 fn = f.get("filename", "")
@@ -69,7 +71,7 @@ class IndexResolutionStrategy(WheelResolutionStrategy):
             return False
         return not req.specifier or req.specifier.contains(ver, prereleases=True)
 
-    def resolve(self, dependency: str, output_dir: Path) -> List[Path]:
+    def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
         Download all available wheel variants for a given dependency into output_dir.
         Returns a list of downloaded .whl Paths.
@@ -81,11 +83,11 @@ class IndexResolutionStrategy(WheelResolutionStrategy):
 
         # Use pip download to fetch all of them directly by URL
         cmd = [
-            sys.executable, "-m", "pip", "download",
-            "--only-binary", ":all:",
-            "--no-deps",
-            "-d", str(output_dir),
-        ] + wheel_urls
+                  sys.executable, "-m", "pip", "download",
+                  "--only-binary", ":all:",
+                  "--no-deps",
+                  "-d", str(output_dir),
+              ] + wheel_urls
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:

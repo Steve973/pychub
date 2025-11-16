@@ -81,13 +81,13 @@ def run_build_cli(wheel_path: Path, tmp_path: Path, test_env: dict, **kwargs):
     if chub_build_dir.exists():
         shutil.rmtree(chub_build_dir)
 
-    args = [str(test_env["python_bin"]), "-m", "pychub.package.cli"]
+    args = [str(test_env["python_bin"]), "-m", "pychub.package.main"]
 
     chubproject = kwargs.get("chubproject")
     if chubproject:
         args += ["--chubproject", chubproject]
     else:
-        args += [str(wheel_path)]
+        args += ["--wheel", str(wheel_path)]
 
     chubproject_save = kwargs.get("chubproject_save")
     if chubproject_save:

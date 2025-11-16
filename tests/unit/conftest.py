@@ -1,4 +1,5 @@
 """Fixtures for initializer unit tests."""
+import hashlib
 import json
 from unittest.mock import Mock, MagicMock
 
@@ -83,16 +84,16 @@ def mock_chubproject_factory():
             mock.scripts = scripts
 
         mapping = {
-            "name": name,
-            "version": version,
+            "name": mock.name,
+            "version": mock.version,
             "project_path": project_path,
             "wheels": mock.wheels,
-            "chub": chub,
-            "entrypoint": entrypoint,
+            "chub": mock.chub,
+            "entrypoint": mock.entrypoint,
             "entrypoint_args": mock.entrypoint_args,
             "includes": mock.includes,
             "include_chubs": mock.include_chubs,
-            "verbose": verbose,
+            "verbose": mock.verbose,
             "metadata": mock.metadata,
             "scripts": {"pre": mock.scripts.pre, "post": mock.scripts.post}
         }
@@ -102,6 +103,8 @@ def mock_chubproject_factory():
 
         # to_json should serialize the full mapping
         mock.to_json.return_value = json.dumps(mapping, sort_keys=True, ensure_ascii=False, indent=2)
+
+        mock.project_hash.return_value = hashlib.sha512(mock.to_json().encode()).hexdigest()[:16]
 
         mock.get_wheel_name_version.return_value = (name, version)
 
@@ -119,13 +122,13 @@ def mock_buildplan():
     mock.__class__ = BuildPlan
     mock.project = None
     mock.project_hash = ""
-    mock.staging_dir = None
-    mock.wheels_dir = "wheels"
+    mock.project_staging_dir = None
+    mock.staged_wheels_dir = "wheels"
     mock.audit_log = []
     mapping = {
         "project": mock.project,
         "project_hash": mock.project_hash,
-        "staging_dir": mock.staging_dir,
+        "project_staging_dir": mock.staging_dir,
         "wheels_dir": mock.wheels_dir,
         "audit_log": mock.audit_log
     }
@@ -146,8 +149,18 @@ def mock_chubproject():
     mock.includes = []
     mock.scripts = Mock(pre=[], post=[])
     mock.metadata = {}
-    mock.to_json.return_value = '{"name": "test-project", "version": "1.0.0"}'
-    mock.to_mapping.return_value = {"name": "test-project", "version": "1.0.0"}
+    mapping = {
+        "name": mock.name,
+        "version": mock.version,
+        "entrypoint": mock.entrypoint,
+        "wheels": mock.wheels,
+        "includes": mock.includes,
+        "scripts": {"pre": mock.scripts.pre, "post": mock.scripts.post},
+        "metadata": mock.metadata
+    }
+    mock.to_mapping.return_value = mapping
+    mock.to_json.return_value = json.dumps(mapping, sort_keys=True, ensure_ascii=False, indent=2)
+    mock.project_hash.return_value = hashlib.sha512(mock.to_json().encode()).hexdigest()[:16]
     return mock
 
 
@@ -170,8 +183,3 @@ def fake_dist_wheels(monkeypatch, tmp_path):
         if pattern.endswith("dist/*.whl"):
             return [str(p) for p in sorted(files)]
         return []
-
-    # monkeypatch.setattr(
-    #     "pychub.model.chubproject_model.glob.glob",
-    #     _fake_glob,
-    #     raising=True)

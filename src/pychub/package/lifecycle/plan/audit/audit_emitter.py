@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from pychub.model.build_event import BuildEvent
-from pychub.model.buildplan_model import BuildPlan
+from pychub.package.context_vars import current_build_plan
 
 _LOG_FILE_NAME = "build.audit.json"
 
@@ -15,7 +15,7 @@ def to_logging_level(event_type: str) -> int:
 
 def emit_event(logger: logging.Logger, event: BuildEvent, indent: int = 2) -> None:
     level = to_logging_level(event.event_type)
-    logger.log(level, event.as_json(indent=indent))
+    logger.log(level, event.to_json(indent=indent))
 
 
 def emit_all(logger: logging.Logger, events: list[BuildEvent], indent: int = 2) -> None:
@@ -46,7 +46,6 @@ def configure_emitter(dest: list[str], level: int = logging.INFO) -> logging.Log
 
 
 def emit_audit_log(
-        plan: BuildPlan,
         dest: str = "file",
         path: Optional[Path] = None,
         indent: int = 2) -> None:
@@ -59,11 +58,12 @@ def emit_audit_log(
         path: If dest='file', the path to write to (default: <plan.staging_dir>/build.audit.json)
         indent: JSON indentation level
     """
+    build_plan = current_build_plan.get()
     dests = []
     for d in dest.split(" "):
         if d == "file" and path is None:
-            dests.append(f"file:{plan.staging_dir}/{_LOG_FILE_NAME}")
+            dests.append(f"file:{build_plan.cache_root}/{build_plan.project_dir}/{_LOG_FILE_NAME}")
         else:
             dests.append(d)
     logger = configure_emitter(dests)
-    emit_all(logger, plan.audit_log, indent)
+    emit_all(logger, build_plan.audit_log, indent)

@@ -7,7 +7,7 @@ import sys
 import zipfile
 from email.parser import Parser
 from pathlib import Path, PurePath
-from typing import Union, List
+from typing import Union
 
 from .constants import (
     CHUB_BUILD_DIR,
@@ -109,7 +109,7 @@ def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
 def copy_runtime_files(chub_build_dir: Path) -> None:
     candidates = [
         Path(__file__).resolve().parent.parent / RUNTIME_DIR,  # src/pychub/runtime
-        Path(__file__).resolve().parent / RUNTIME_DIR,         # src/pychub/package/runtime (legacy)
+        Path(__file__).resolve().parent / RUNTIME_DIR,  # src/pychub/package/runtime (legacy)
     ]
     runtime_src = next((p for p in candidates if p.exists()), None)
     if runtime_src is None:
@@ -161,9 +161,9 @@ def copy_included_files(chub_base: Path, included_files: list[str] | []) -> None
 
 
 def copy_install_scripts(
-    scripts_base: Path,
-    install_scripts: list[tuple[Path, str]] | [],
-    scripts_type: str) -> None:
+        scripts_base: Path,
+        install_scripts: list[tuple[Path, str]] | [],
+        scripts_type: str) -> None:
     if not install_scripts:
         return
 
@@ -179,10 +179,10 @@ def copy_install_scripts(
 
 
 def download_wheel_deps(
-    wheel_path: str | Path,
-    dest: str | Path,
-    only_binary: bool = True,
-    extra_pip_args: list[str] | None = None) -> list[str]:
+        wheel_path: str | Path,
+        dest: str | Path,
+        only_binary: bool = True,
+        extra_pip_args: list[str] | None = None) -> list[str]:
     """Resolve and download the wheel and all its dependencies into dest."""
     wheel_path = str(Path(wheel_path).resolve())
     dest = Path(dest).resolve()
@@ -311,7 +311,7 @@ def stage_path_dependencies(project_dir: Path, cache_dir: Path) -> None:
             shutil.copy2(w, cache_dir / w.name)
 
 
-def absolutize_paths(paths: Union[str, List[str]], base_dir: Path) -> Union[str, List[str]]:
+def absolutize_paths(paths: Union[str, list[str]], base_dir: Path) -> Union[str, list[str]]:
     """
     Ensures that each path is absolute. If a path is not absolute, it is joined with base_dir.
     If a single string is passed, a single string is returned. Otherwise, a list is returned.
@@ -342,8 +342,10 @@ def build_chub(chubproject: ChubProject) -> Path:
     if chubproject.wheels:
         wheel_paths.extend(_paths(chubproject.wheels))
 
-    post_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.post, project_dir)) if chubproject.scripts.post else []
-    pre_install_scripts = prefixed_script_names(absolutize_paths(chubproject.scripts.pre, project_dir)) if chubproject.scripts.pre else []
+    post_install_scripts = prefixed_script_names(
+        absolutize_paths(chubproject.scripts.post, project_dir)) if chubproject.scripts.post else []
+    pre_install_scripts = prefixed_script_names(
+        absolutize_paths(chubproject.scripts.pre, project_dir)) if chubproject.scripts.pre else []
 
     includes_raw = chubproject.includes or []
     included_files = []
@@ -371,7 +373,7 @@ def build_chub(chubproject: ChubProject) -> Path:
     validate_chub_structure(
         chub_build_dir,
         [str(path) for path, _ in (post_install_scripts or [])],
-        [str(path) for path, _ in (pre_install_scripts  or [])],
+        [str(path) for path, _ in (pre_install_scripts or [])],
         included_files)
 
     wheel_libs_dir = chub_build_dir / CHUB_LIBS_DIR
@@ -382,7 +384,7 @@ def build_chub(chubproject: ChubProject) -> Path:
 
     script_base = chub_build_dir / CHUB_SCRIPTS_DIR
     copy_install_scripts(script_base, post_install_scripts, CHUB_POST_INSTALL_SCRIPTS_DIR)
-    copy_install_scripts(script_base, pre_install_scripts,  CHUB_PRE_INSTALL_SCRIPTS_DIR)
+    copy_install_scripts(script_base, pre_install_scripts, CHUB_PRE_INSTALL_SCRIPTS_DIR)
     copy_included_files(chub_build_dir, included_files)
     copy_runtime_files(chub_build_dir)
 
@@ -393,7 +395,7 @@ def build_chub(chubproject: ChubProject) -> Path:
         "wheels": wheels_map,
         "includes": included_files or [],
         "scripts": {
-            "pre":  [name for _, name in (pre_install_scripts  or [])],
+            "pre": [name for _, name in (pre_install_scripts or [])],
             "post": [name for _, name in (post_install_scripts or [])],
         },
         "metadata": metadata

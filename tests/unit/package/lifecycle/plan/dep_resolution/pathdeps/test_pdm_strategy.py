@@ -394,8 +394,8 @@ def test_extract_paths_with_dev_dependencies(tmp_path):
 
 def test_strategy_inherits_from_base():
     """Test that PdmPathDepStrategy inherits from PathDepStrategy."""
-    from pychub.package.lifecycle.plan.dep_resolution.pathdeps.path_dep_strategy_base import PathDepStrategy
-    assert issubclass(PdmPathDepStrategy, PathDepStrategy)
+    from pychub.package.lifecycle.plan.dep_resolution.pathdeps.project_path_strategy_base import ProjectPathStrategy
+    assert issubclass(PdmPathDepStrategy, ProjectPathStrategy)
 
 
 def test_strategy_implements_all_abstract_methods():

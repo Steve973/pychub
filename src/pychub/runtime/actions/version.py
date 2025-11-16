@@ -1,5 +1,5 @@
-import sys
 import importlib.metadata as im
+import sys
 
 from .discover import discover_wheels
 

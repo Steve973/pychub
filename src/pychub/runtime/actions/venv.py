@@ -11,7 +11,8 @@ def _venv_python(venv_path: Path) -> Path:
     return venv_path / "bin" / "python"
 
 
-def create_venv(path: Path, wheels: list[Path], dry_run: bool = False, quiet: bool = False, verbose: bool = False) -> None:
+def create_venv(path: Path, wheels: list[Path], dry_run: bool = False, quiet: bool = False,
+                verbose: bool = False) -> None:
     if dry_run:
         print(f"[dry-run] would create venv at {path}")
         print("[dry-run] would install wheels:")

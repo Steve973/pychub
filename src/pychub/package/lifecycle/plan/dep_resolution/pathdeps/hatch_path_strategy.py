@@ -1,14 +1,13 @@
 from pathlib import Path
-from typing import List
-from .path_dep_strategy_base import PathDepStrategy
+
+from .project_path_strategy_base import ProjectPathStrategy
 
 
-class HatchPathDepStrategy(PathDepStrategy):
+class HatchProjectPathStrategy(ProjectPathStrategy):
     """Extracts path dependencies from [project.dependencies] (Hatch uses PEP 621)."""
 
-    @staticmethod
-    def label() -> str:
-        return "Hatch"
+    name = "hatch"
+    precedence = 60
 
     @staticmethod
     def can_handle(data: dict) -> bool:
@@ -18,10 +17,10 @@ class HatchPathDepStrategy(PathDepStrategy):
         return "hatch" in tool and "dependencies" in project
 
     @staticmethod
-    def extract_paths(data: dict, project_root: Path) -> List[Path]:
+    def extract_paths(data: dict, project_root: Path) -> list[Path]:
         project = data.get("project", {}) or {}
         project_deps = project.get("dependencies", []) or []
-        out: List[Path] = []
+        out: list[Path] = []
         for dep in project_deps:
             if isinstance(dep, dict) and "path" in dep:
                 out.append((project_root / dep["path"]).resolve())

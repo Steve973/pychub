@@ -9,7 +9,7 @@ def _run_entrypoint_with_python(
         python: Path,
         dry_run: bool,
         entrypoint: str | None,
-        argv: list[str],) -> int:
+        argv: list[str], ) -> int:
     """Run entrypoint under a specific interpreter.
 
     Entry point forms supported by README:

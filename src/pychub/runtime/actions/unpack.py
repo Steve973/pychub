@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
+from pathlib import Path
+
 
 def _copy_tree(src: Path, dst: Path) -> int:
     if not src.exists():
@@ -14,6 +15,7 @@ def _copy_tree(src: Path, dst: Path) -> int:
             shutil.copy2(p, dst / rel)
             count += 1
     return count
+
 
 def unpack_chub(bundle_root: Path, dest: Path | None) -> None:
     dst = dest or (bundle_root.parent / (bundle_root.name + "_unpacked"))

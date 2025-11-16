@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from pychub.package import context_vars
 from pychub.package.lifecycle.execute.bundler import (
     write_chubconfig_file,
     create_chub_build_dir,
@@ -40,41 +41,44 @@ def test_write_chubconfig_file_basic(tmp_path, mock_buildplan, mock_chubproject_
         metadata={"author": "Test Author"}
     )
     mock_buildplan.project = project
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.ChubConfig") as mock_chubconfig_class:
-        mock_chubconfig = MagicMock()
-        mock_chubconfig_class.from_mapping.return_value = mock_chubconfig
-        mock_chubconfig.to_yaml.return_value = "yaml_content"
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.ChubConfig") as mock_chubconfig_class:
+            mock_chubconfig = MagicMock()
+            mock_chubconfig_class.from_mapping.return_value = mock_chubconfig
+            mock_chubconfig.to_yaml.return_value = "yaml_content"
 
-        write_chubconfig_file(
-            mock_buildplan,
-            "test-pkg",
-            "1.0.0",
-            ["pkg1==1.0.0", "pkg2==2.0.0"],
-            ["platform1", "platform2"],
-            chub_build_dir
-        )
+            write_chubconfig_file(
+                "test-pkg",
+                "1.0.0",
+                ["pkg1==1.0.0", "pkg2==2.0.0"],
+                ["platform1", "platform2"],
+                chub_build_dir
+            )
 
-        # Verify ChubConfig.from_mapping called with correct args
-        mock_chubconfig_class.from_mapping.assert_called_once()
-        call_args = mock_chubconfig_class.from_mapping.call_args[0][0]
-        assert call_args["name"] == "test-pkg"
-        assert call_args["version"] == "1.0.0"
-        assert call_args["entrypoint"] == "test:main"
-        assert call_args["includes"] == ["config.yaml"]
-        assert call_args["scripts"]["pre"] == ["setup.sh"]
-        assert call_args["scripts"]["post"] == ["cleanup.sh"]
-        assert call_args["pinned_wheels"] == ["pkg1==1.0.0", "pkg2==2.0.0"]
-        assert call_args["compatibility"]["targets"] == ["platform1", "platform2"]
-        assert call_args["metadata"] == {"author": "Test Author"}
+            # Verify ChubConfig.from_mapping called with correct args
+            mock_chubconfig_class.from_mapping.assert_called_once()
+            call_args = mock_chubconfig_class.from_mapping.call_args[0][0]
+            assert call_args["name"] == "test-pkg"
+            assert call_args["version"] == "1.0.0"
+            assert call_args["entrypoint"] == "test:main"
+            assert call_args["includes"] == ["config.yaml"]
+            assert call_args["scripts"]["pre"] == ["setup.sh"]
+            assert call_args["scripts"]["post"] == ["cleanup.sh"]
+            assert call_args["pinned_wheels"] == ["pkg1==1.0.0", "pkg2==2.0.0"]
+            assert call_args["compatibility"]["targets"] == ["platform1", "platform2"]
+            assert call_args["metadata"] == {"author": "Test Author"}
 
-        # Verify validate called
-        mock_chubconfig.validate.assert_called_once()
+            # Verify validate called
+            mock_chubconfig.validate.assert_called_once()
 
-        # Verify file written
-        chubconfig_file = chub_build_dir / ".chubconfig"
-        assert chubconfig_file.exists()
-        assert chubconfig_file.read_text() == "yaml_content"
+            # Verify file written
+            chubconfig_file = chub_build_dir / ".chubconfig"
+            assert chubconfig_file.exists()
+            assert chubconfig_file.read_text() == "yaml_content"
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_write_chubconfig_file_empty_scripts(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -88,24 +92,27 @@ def test_write_chubconfig_file_empty_scripts(tmp_path, mock_buildplan, mock_chub
         scripts={"pre": [], "post": []}
     )
     mock_buildplan.project = project
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.ChubConfig") as mock_chubconfig_class:
-        mock_chubconfig = MagicMock()
-        mock_chubconfig_class.from_mapping.return_value = mock_chubconfig
-        mock_chubconfig.to_yaml.return_value = "yaml_content"
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.ChubConfig") as mock_chubconfig_class:
+            mock_chubconfig = MagicMock()
+            mock_chubconfig_class.from_mapping.return_value = mock_chubconfig
+            mock_chubconfig.to_yaml.return_value = "yaml_content"
 
-        write_chubconfig_file(
-            mock_buildplan,
-            "test-pkg",
-            "1.0.0",
-            [],
-            [],
-            chub_build_dir
-        )
+            write_chubconfig_file(
+                "test-pkg",
+                "1.0.0",
+                [],
+                [],
+                chub_build_dir
+            )
 
-        call_args = mock_chubconfig_class.from_mapping.call_args[0][0]
-        assert call_args["scripts"]["pre"] == []
-        assert call_args["scripts"]["post"] == []
+            call_args = mock_chubconfig_class.from_mapping.call_args[0][0]
+            assert call_args["scripts"]["pre"] == []
+            assert call_args["scripts"]["post"] == []
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 # ============================================================================
@@ -411,15 +418,19 @@ def test_copy_runtime_files(tmp_path, mock_buildplan):
     (runtime_src / "main.py").write_text("main content")
     (runtime_src / "__main__.py").write_text("main content")
 
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
 
     dest_dir = tmp_path / "dest" / "runtime"
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.RUNTIME_DIR", "runtime"):
-        with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
-            copy_runtime_files(mock_buildplan, dest_dir)
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.RUNTIME_DIR", "runtime"):
+            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
+                copy_runtime_files(dest_dir)
 
-            mock_copytree.assert_called_once_with(runtime_src, dest_dir, dirs_exist_ok=True)
+                mock_copytree.assert_called_once_with(runtime_src, dest_dir, dirs_exist_ok=True)
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_copy_runtime_files_dirs_exist_ok(tmp_path, mock_buildplan):
@@ -429,15 +440,19 @@ def test_copy_runtime_files_dirs_exist_ok(tmp_path, mock_buildplan):
     runtime_src = staging_dir / "runtime"
     runtime_src.mkdir()
 
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     dest_dir = tmp_path / "dest" / "runtime"
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.RUNTIME_DIR", "runtime"):
-        with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
-            copy_runtime_files(mock_buildplan, dest_dir)
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.RUNTIME_DIR", "runtime"):
+            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
+                copy_runtime_files(dest_dir)
 
-            # Verify dirs_exist_ok=True passed
-            assert mock_copytree.call_args[1]["dirs_exist_ok"] is True
+                # Verify dirs_exist_ok=True passed
+                assert mock_copytree.call_args[1]["dirs_exist_ok"] is True
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 # ============================================================================
@@ -453,14 +468,18 @@ def test_copy_included_files(tmp_path, mock_buildplan):
     includes_src.mkdir()
     (includes_src / "config.yaml").write_text("config")
 
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     dest_dir = tmp_path / "dest" / "includes"
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.CHUB_INCLUDES_DIR", "includes"):
-        with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
-            copy_included_files(mock_buildplan, dest_dir)
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.CHUB_INCLUDES_DIR", "includes"):
+            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
+                copy_included_files(dest_dir)
 
-            mock_copytree.assert_called_once_with(includes_src, dest_dir, dirs_exist_ok=True)
+                mock_copytree.assert_called_once_with(includes_src, dest_dir, dirs_exist_ok=True)
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 # ============================================================================
@@ -476,14 +495,18 @@ def test_copy_install_scripts(tmp_path, mock_buildplan):
     scripts_src.mkdir()
     (scripts_src / "setup.sh").write_text("setup")
 
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     dest_dir = tmp_path / "dest" / "scripts"
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.CHUB_SCRIPTS_DIR", "scripts"):
-        with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
-            copy_install_scripts(mock_buildplan, dest_dir)
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.CHUB_SCRIPTS_DIR", "scripts"):
+            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree") as mock_copytree:
+                copy_install_scripts(dest_dir)
 
-            mock_copytree.assert_called_once_with(scripts_src, dest_dir, dirs_exist_ok=True)
+                mock_copytree.assert_called_once_with(scripts_src, dest_dir, dirs_exist_ok=True)
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 # ============================================================================
@@ -501,18 +524,22 @@ def test_create_chub_archive_basic(tmp_path, mock_buildplan):
     (libs_dir / "test.whl").write_text("wheel")
 
     archive_path = tmp_path / "output.chub"
-    mock_buildplan.staging_dir = tmp_path
+    mock_buildplan.cache_root = tmp_path
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    result = create_chub_archive(mock_buildplan, build_dir, archive_path)
+    result = create_chub_archive(build_dir, archive_path)
 
     assert result == archive_path
     assert archive_path.exists()
 
     # Verify archive contents
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        names = zf.namelist()
-        assert ".chubconfig" in names
-        assert "libs/test.whl" in names or "libs\\test.whl" in names
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            names = zf.namelist()
+            assert ".chubconfig" in names
+            assert "libs/test.whl" in names or "libs\\test.whl" in names
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_create_chub_archive_excludes_self(tmp_path, mock_buildplan):
@@ -523,13 +550,17 @@ def test_create_chub_archive_excludes_self(tmp_path, mock_buildplan):
 
     # Archive path inside the build dir
     archive_path = build_dir / "output.chub"
-    mock_buildplan.staging_dir = tmp_path
+    mock_buildplan.cache_root = tmp_path
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    result = create_chub_archive(mock_buildplan, build_dir, archive_path)
+    result = create_chub_archive(build_dir, archive_path)
 
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        names = zf.namelist()
-        assert "output.chub" not in names
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            names = zf.namelist()
+            assert "output.chub" not in names
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_create_chub_archive_compression(tmp_path, mock_buildplan):
@@ -539,14 +570,18 @@ def test_create_chub_archive_compression(tmp_path, mock_buildplan):
     (build_dir / "test.txt").write_text("x" * 1000)
 
     archive_path = tmp_path / "output.chub"
-    mock_buildplan.staging_dir = tmp_path
+    mock_buildplan.cache_root = tmp_path
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    create_chub_archive(mock_buildplan, build_dir, archive_path)
+    create_chub_archive(build_dir, archive_path)
 
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        for info in zf.infolist():
-            # Verify compression type
-            assert info.compress_type == zipfile.ZIP_DEFLATED
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            for info in zf.infolist():
+                # Verify compression type
+                assert info.compress_type == zipfile.ZIP_DEFLATED
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_create_chub_archive_nested_directories(tmp_path, mock_buildplan):
@@ -558,13 +593,17 @@ def test_create_chub_archive_nested_directories(tmp_path, mock_buildplan):
     (nested / "file.txt").write_text("nested")
 
     archive_path = tmp_path / "output.chub"
-    mock_buildplan.staging_dir = tmp_path
+    mock_buildplan.cache_root = tmp_path
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    create_chub_archive(mock_buildplan, build_dir, archive_path)
+    create_chub_archive(build_dir, archive_path)
 
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        names = [n.replace("\\", "/") for n in zf.namelist()]
-        assert "level1/level2/file.txt" in names
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            names = [n.replace("\\", "/") for n in zf.namelist()]
+            assert "level1/level2/file.txt" in names
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_create_chub_archive_preserves_relative_paths(tmp_path, mock_buildplan):
@@ -577,17 +616,21 @@ def test_create_chub_archive_preserves_relative_paths(tmp_path, mock_buildplan):
     (subdir / "sub_file.txt").write_text("sub")
 
     archive_path = tmp_path / "output.chub"
-    mock_buildplan.staging_dir = tmp_path
+    mock_buildplan.cache_root = tmp_path
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    create_chub_archive(mock_buildplan, build_dir, archive_path)
+    create_chub_archive(build_dir, archive_path)
 
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        names = zf.namelist()
-        # Paths should be relative to build_dir
-        assert any("root_file.txt" in n for n in names)
-        assert any("subdir" in n and "sub_file.txt" in n for n in names)
-        # Should NOT contain absolute paths
-        assert not any(str(tmp_path) in n for n in names)
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            names = zf.namelist()
+            # Paths should be relative to build_dir
+            assert any("root_file.txt" in n for n in names)
+            assert any("subdir" in n and "sub_file.txt" in n for n in names)
+            # Should NOT contain absolute paths
+            assert not any(str(tmp_path) in n for n in names)
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 # ============================================================================
@@ -624,19 +667,23 @@ def test_bundle_chub_full_flow(tmp_path, mock_buildplan, mock_chubproject_factor
         entrypoint="test:main"
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
-        with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
-            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-                with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                    expected_path = staging_dir / ".chub" / "test-pkg-1.0.0.chub"
-                    mock_archive.return_value = expected_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
+            with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
+                with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+                    with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                        expected_path = staging_dir / ".chub" / "test-pkg-1.0.0.chub"
+                        mock_archive.return_value = expected_path
 
-                    result = bundle_chub(mock_buildplan)
+                        result = bundle_chub()
 
-                    assert result == expected_path
+                        assert result == expected_path
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_uses_project_name_version(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -662,22 +709,26 @@ def test_bundle_chub_uses_project_name_version(tmp_path, mock_buildplan, mock_ch
         wheels=["other-1.0.0-py3-none-any.whl"]
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
-        with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file") as mock_write:
-            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-                with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                    expected_path = staging_dir / ".chub" / "my-project-2.5.0.chub"
-                    mock_archive.return_value = expected_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
+            with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file") as mock_write:
+                with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+                    with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                        expected_path = staging_dir / ".chub" / "my-project-2.5.0.chub"
+                        mock_archive.return_value = expected_path
 
-                    bundle_chub(mock_buildplan)
+                        bundle_chub()
 
-                    # Verify write_chubconfig_file called with project name/version
-                    call_args = mock_write.call_args[0]
-                    assert call_args[1] == "my-project"
-                    assert call_args[2] == "2.5.0"
+                        # Verify write_chubconfig_file called with project name/version
+                        call_args = mock_write.call_args[0]
+                        assert call_args[0] == "my-project"
+                        assert call_args[1] == "2.5.0"
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_falls_back_to_wheel_name(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -703,23 +754,27 @@ def test_bundle_chub_falls_back_to_wheel_name(tmp_path, mock_buildplan, mock_chu
         wheels=["extracted-3.0.0-py3-none-any.whl"]
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
-        with patch("pychub.package.lifecycle.execute.bundler.parse_wheel_filename") as mock_parse:
-            mock_parse.return_value = ("extracted", "3.0.0", None, None)
-            with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file") as mock_write:
-                with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-                    with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                        expected_path = staging_dir / ".chub" / "extracted-3.0.0.chub"
-                        mock_archive.return_value = expected_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
+            with patch("pychub.package.lifecycle.execute.bundler.parse_wheel_filename") as mock_parse:
+                mock_parse.return_value = ("extracted", "3.0.0", None, None)
+                with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file") as mock_write:
+                    with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+                        with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                            expected_path = staging_dir / ".chub" / "extracted-3.0.0.chub"
+                            mock_archive.return_value = expected_path
 
-                        bundle_chub(mock_buildplan)
+                            bundle_chub()
 
-                        call_args = mock_write.call_args[0]
-                        assert call_args[1] == "extracted"
-                        assert call_args[2] == "3.0.0"
+                            call_args = mock_write.call_args[0]
+                            assert call_args[0] == "extracted"
+                            assert call_args[1] == "3.0.0"
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_raises_when_no_name_version(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -738,8 +793,9 @@ def test_bundle_chub_raises_when_no_name_version(tmp_path, mock_buildplan, mock_
         wheels=[]
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
     runtime_dir = staging_dir / "runtime"
     runtime_dir.mkdir()
@@ -748,9 +804,12 @@ def test_bundle_chub_raises_when_no_name_version(tmp_path, mock_buildplan, mock_
     scripts_dir = staging_dir / "scripts"
     scripts_dir.mkdir()
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-        with pytest.raises(ValueError, match="Missing distribution name and version"):
-            bundle_chub(mock_buildplan)
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+            with pytest.raises(ValueError, match="Missing distribution name and version"):
+                bundle_chub()
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_missing_staged_wheels_dir(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -763,11 +822,15 @@ def test_bundle_chub_missing_staged_wheels_dir(tmp_path, mock_buildplan, mock_ch
         version="1.0.0"
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with pytest.raises(FileNotFoundError, match="Missing staged wheels"):
-        bundle_chub(mock_buildplan)
+    try:
+        with pytest.raises(FileNotFoundError, match="Missing staged wheels"):
+            bundle_chub()
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_copies_all_wheels(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -795,20 +858,24 @@ def test_bundle_chub_copies_all_wheels(tmp_path, mock_buildplan, mock_chubprojec
         wheels=["pkg1-1.0.0-py3-none-any.whl", "pkg2-2.0.0-py3-none-any.whl"]
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2") as mock_copy:
-        with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
-            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-                with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                    expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
-                    mock_archive.return_value = expected_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2") as mock_copy:
+            with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
+                with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+                    with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                        expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
+                        mock_archive.return_value = expected_path
 
-                    bundle_chub(mock_buildplan)
+                        bundle_chub()
 
-                    # Verify both wheels were copied
-                    assert mock_copy.call_count == 2
+                        # Verify both wheels were copied
+                        assert mock_copy.call_count == 2
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_detects_platform_targets(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -835,22 +902,26 @@ def test_bundle_chub_detects_platform_targets(tmp_path, mock_buildplan, mock_chu
         wheels=["test-1.0.0-py3-none-any.whl"]
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
-        with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file") as mock_write:
-            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-                with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                    expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
-                    mock_archive.return_value = expected_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
+            with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file") as mock_write:
+                with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+                    with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                        expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
+                        mock_archive.return_value = expected_path
 
-                    bundle_chub(mock_buildplan)
+                        bundle_chub()
 
-                    # Verify targets passed to write_chubconfig_file
-                    call_args = mock_write.call_args[0]
-                    targets = call_args[4]
-                    assert set(targets) == {"linux_x86_64", "win_amd64", "macosx_arm64"}
+                        # Verify targets passed to write_chubconfig_file
+                        call_args = mock_write.call_args[0]
+                        targets = call_args[3]
+                        assert set(targets) == {"linux_x86_64", "win_amd64", "macosx_arm64"}
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_calls_copy_functions(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -876,23 +947,27 @@ def test_bundle_chub_calls_copy_functions(tmp_path, mock_buildplan, mock_chubpro
         wheels=["test-1.0.0-py3-none-any.whl"]
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
-        with patch("pychub.package.lifecycle.execute.bundler.copy_runtime_files") as mock_runtime:
-            with patch("pychub.package.lifecycle.execute.bundler.copy_included_files") as mock_includes:
-                with patch("pychub.package.lifecycle.execute.bundler.copy_install_scripts") as mock_scripts:
-                    with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
-                        with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                            expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
-                            mock_archive.return_value = expected_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
+            with patch("pychub.package.lifecycle.execute.bundler.copy_runtime_files") as mock_runtime:
+                with patch("pychub.package.lifecycle.execute.bundler.copy_included_files") as mock_includes:
+                    with patch("pychub.package.lifecycle.execute.bundler.copy_install_scripts") as mock_scripts:
+                        with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
+                            with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                                expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
+                                mock_archive.return_value = expected_path
 
-                            bundle_chub(mock_buildplan)
+                                bundle_chub()
 
-                            mock_runtime.assert_called_once()
-                            mock_includes.assert_called_once()
-                            mock_scripts.assert_called_once()
+                                mock_runtime.assert_called_once()
+                                mock_includes.assert_called_once()
+                                mock_scripts.assert_called_once()
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_uses_custom_chub_path(tmp_path, mock_buildplan, mock_chubproject_factory):
@@ -921,21 +996,25 @@ def test_bundle_chub_uses_custom_chub_path(tmp_path, mock_buildplan, mock_chubpr
         chub=str(custom_path)
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
-        with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
-            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-                with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                    mock_archive.return_value = custom_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
+            with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
+                with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+                    with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                        mock_archive.return_value = custom_path
 
-                    result = bundle_chub(mock_buildplan)
+                        result = bundle_chub()
 
-                    # Verify custom path used
-                    call_args = mock_archive.call_args[0]
-                    assert call_args[2] == Path(custom_path)
-                    assert result == custom_path
+                        # Verify custom path used
+                        call_args = mock_archive.call_args[0]
+                        assert call_args[1] == Path(custom_path)
+                        assert result == custom_path
+    finally:
+        context_vars.current_build_plan.reset(token)
 
 
 def test_bundle_chub_prints_output_message(tmp_path, mock_buildplan, mock_chubproject_factory, capsys):
@@ -961,18 +1040,22 @@ def test_bundle_chub_prints_output_message(tmp_path, mock_buildplan, mock_chubpr
         wheels=["test-1.0.0-py3-none-any.whl"]
     )
     mock_buildplan.project = project
-    mock_buildplan.staging_dir = staging_dir
+    mock_buildplan.cache_root = staging_dir
     mock_buildplan.wheels_dir = Path("wheels")
+    token = context_vars.current_build_plan.set(mock_buildplan)
 
-    with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
-        with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
-            with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
-                with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
-                    expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
-                    mock_archive.return_value = expected_path
+    try:
+        with patch("pychub.package.lifecycle.execute.bundler.shutil.copy2"):
+            with patch("pychub.package.lifecycle.execute.bundler.write_chubconfig_file"):
+                with patch("pychub.package.lifecycle.execute.bundler.shutil.copytree"):
+                    with patch("pychub.package.lifecycle.execute.bundler.create_chub_archive") as mock_archive:
+                        expected_path = staging_dir / ".chub" / "test-1.0.0.chub"
+                        mock_archive.return_value = expected_path
 
-                    bundle_chub(mock_buildplan)
+                        bundle_chub()
 
-                    captured = capsys.readouterr()
-                    assert "Built" in captured.out
-                    assert str(expected_path) in captured.out
+                        captured = capsys.readouterr()
+                        assert "Built" in captured.out
+                        assert str(expected_path) in captured.out
+    finally:
+        context_vars.current_build_plan.reset(token)

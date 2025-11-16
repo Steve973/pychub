@@ -3,15 +3,10 @@ from pathlib import Path
 
 import pytest
 
+from pychub.helper.toml_utils import load_toml_text
 from pychub.model.chubproject_model import ChubProject, ChubProjectError
 from tests.integration._asserts import assert_rc_ok
 from tests.integration.conftest import run_build_cli
-
-# --- reader: tomllib on 3.11+, tomli on 3.9–3.10 ---
-try:
-    import tomllib  # Python 3.11+
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore
 
 
 @pytest.fixture
@@ -75,8 +70,8 @@ def test_save_roundtrip_toml_equivalence(saved_chubproject_file, loaded_project,
 
     ChubProject.save_file(loaded_project, second_path, overwrite=True)
 
-    doc1 = tomllib.loads(original_path.read_text("utf-8"))["tool"]["pychub"]["package"]
-    doc2 = tomllib.loads(second_path.read_text("utf-8"))["tool"]["pychub"]["package"]
+    doc1 = load_toml_text(original_path.read_text("utf-8"))["tool"]["pychub"]["package"]
+    doc2 = load_toml_text(second_path.read_text("utf-8"))["tool"]["pychub"]["package"]
 
     doc1["metadata"].pop("__file__", None)
     doc2["metadata"].pop("__file__", None)

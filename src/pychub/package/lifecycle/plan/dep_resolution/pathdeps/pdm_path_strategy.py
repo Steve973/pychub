@@ -1,14 +1,13 @@
 from pathlib import Path
-from typing import List
-from .path_dep_strategy_base import PathDepStrategy
+
+from .project_path_strategy_base import ProjectPathStrategy
 
 
-class PdmPathDepStrategy(PathDepStrategy):
+class PdmProjectPathStrategy(ProjectPathStrategy):
     """Extracts path dependencies from [tool.pdm.dependencies]."""
 
-    @staticmethod
-    def label() -> str:
-        return "PDM"
+    name = "pdm"
+    precedence = 70
 
     @staticmethod
     def can_handle(data: dict) -> bool:
@@ -17,11 +16,11 @@ class PdmPathDepStrategy(PathDepStrategy):
         return "dependencies" in tool_pdm
 
     @staticmethod
-    def extract_paths(data: dict, project_root: Path) -> List[Path]:
+    def extract_paths(data: dict, project_root: Path) -> list[Path]:
         tool = data.get("tool", {}) or {}
         tool_pdm = tool.get("pdm", {}) or {}
         tool_pdm_dependencies = tool_pdm.get("dependencies", {}) or {}
-        out: List[Path] = []
+        out: list[Path] = []
         for _, val in tool_pdm_dependencies.items():
             if isinstance(val, dict) and "path" in val:
                 out.append((project_root / val["path"]).resolve())

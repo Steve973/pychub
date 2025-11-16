@@ -6,16 +6,18 @@ from pathlib import Path
 
 from ..utils import pep668_blocked, die
 
+
 def _pip_cmd(python: str | None = None) -> list[str]:
     return [(python or sys.executable), "-m", "pip"]
 
+
 def install_wheels(
-    wheels: list[Path],
-    dry_run: bool = False,
-    quiet: bool = False,
-    verbose: bool = False,
-    no_deps: bool = False,
-    python: str | None = None) -> None:
+        wheels: list[Path],
+        dry_run: bool = False,
+        quiet: bool = False,
+        verbose: bool = False,
+        no_deps: bool = False,
+        python: str | None = None) -> None:
     if dry_run:
         if not quiet:
             print("[dry-run] would install:")

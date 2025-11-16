@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("-l", "--list",
                    action="store_true",
-                   help="List bundled wheels and exit")
+                   help="list bundled wheels and exit")
 
     p.add_argument("--no-post-scripts",
                    action="store_true",

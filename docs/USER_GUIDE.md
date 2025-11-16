@@ -339,7 +339,7 @@ Notes:
   - Optional.
   - Repeatable option to supply multiple key-value pairs.
   - Values can be single items or space‑separated lists.
-  - Lists are parsed as YAML arrays in the `.chubconfig` file. 
+  - lists are parsed as YAML arrays in the `.chubconfig` file. 
   - Formats:
     - Single option with a single key-value pair:
       `--metadata-entry key=value`
@@ -602,13 +602,13 @@ selected by `--run` (or the baked‑in entrypoint if none is provided).
 | `--exec`               | `-e`       | Run entrypoint in a temporary venv (deleted after)       |
 | `--help`               | `-h`       | Show help and exit                                       |
 | `--info`               | `-i`       | Display `.chub` info and exit                            |
-| `--list`               | `-l`       | List bundled wheels and exit                             |
+| `--list`               | `-l`       | list bundled wheels and exit                             |
 | `--no-post-scripts`    |            | Skip post install scripts                                |
 | `--no-pre-scripts`     |            | Skip pre install scripts                                 |
 | `--no-scripts`         |            | Skip pre/post install scripts                            |
 | `--quiet`              | `-q`       | Suppress output wherever possible                        |
 | `--run [ENTRYPOINT]`   | `-r`       | Run the baked-in or specified `ENTRYPOINT`               |
-| `--show-compatibility` | `-c`       | List the supported interpreter/abi/platform combinations |
+| `--show-compatibility` | `-c`       | list the supported interpreter/abi/platform combinations |
 | `--show-scripts`       | `-s`       | Show the pre/post install scripts and exit               |
 | `--unpack [DIR]`       | `-u`       | Extract `.chubconfig` and all wheel-related files        |
 | `--venv DIR`           |            | Create a venv and install wheels into it                 |
@@ -633,7 +633,7 @@ Notes:
     - shows pre/post install scripts (like with `--show-scripts`).
     - includes `--version` information.
 - `--list`:
-  - Lists bundled wheels and exit.
+  - lists bundled wheels and exit.
   - Wheels are listed in the order they were added to the `.chub` file.
   - Included dependency wheels are shown under the dependent wheel:
       ```yaml
@@ -820,12 +820,12 @@ own use cases.
          -- --mode train --limit 100
     ```
 
-17. List bundled wheels (names)
+17. list bundled wheels (names)
     ```bash
     python mypackage.chub --list
     ```
 
-18. List bundled wheels quietly
+18. list bundled wheels quietly
     ```bash
     python mypackage.chub \
          --list \
