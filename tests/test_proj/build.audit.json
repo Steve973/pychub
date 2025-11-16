@@ -1,0 +1,234 @@
+{
+  "timestamp": "2025-11-03T21:33:33.253062+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "LIFECYCLE",
+  "substage": null,
+  "message": "Starting pychub build",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.253066+00:00",
+  "level": "INFO",
+  "event_type": "INPUT",
+  "stage": "LIFECYCLE",
+  "substage": null,
+  "message": "Build will use CLI options",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.253068+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": null,
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.253070+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "check_python_version",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.253072+00:00",
+  "level": "INFO",
+  "event_type": "COMPLETE",
+  "stage": "INIT",
+  "substage": "check_python_version",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.253074+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "verify_pip",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.352493+00:00",
+  "level": "INFO",
+  "event_type": "COMPLETE",
+  "stage": "INIT",
+  "substage": "verify_pip",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.352498+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "parse_cli",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.353076+00:00",
+  "level": "INFO",
+  "event_type": "COMPLETE",
+  "stage": "INIT",
+  "substage": "parse_cli",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.353080+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "process_cli_options",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.353122+00:00",
+  "level": "ERROR",
+  "event_type": "EXCEPTION",
+  "stage": "INIT",
+  "substage": "process_cli_options",
+  "message": "[Errno 2] No such file or directory: '['",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.353126+00:00",
+  "level": "ERROR",
+  "event_type": "EXCEPTION",
+  "stage": "INIT",
+  "substage": null,
+  "message": "[Errno 2] No such file or directory: '['",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:33:33.353131+00:00",
+  "level": "INFO",
+  "event_type": "FAIL",
+  "stage": "LIFECYCLE",
+  "substage": null,
+  "message": "[Errno 2] No such file or directory: '['",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.308066+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "LIFECYCLE",
+  "substage": null,
+  "message": "Starting pychub build",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.308070+00:00",
+  "level": "INFO",
+  "event_type": "INPUT",
+  "stage": "LIFECYCLE",
+  "substage": null,
+  "message": "Build will use CLI options",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.308073+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": null,
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.308075+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "check_python_version",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.308077+00:00",
+  "level": "INFO",
+  "event_type": "COMPLETE",
+  "stage": "INIT",
+  "substage": "check_python_version",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.308079+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "verify_pip",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.409798+00:00",
+  "level": "INFO",
+  "event_type": "COMPLETE",
+  "stage": "INIT",
+  "substage": "verify_pip",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.409803+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "parse_cli",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.410381+00:00",
+  "level": "INFO",
+  "event_type": "COMPLETE",
+  "stage": "INIT",
+  "substage": "parse_cli",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.410385+00:00",
+  "level": "INFO",
+  "event_type": "START",
+  "stage": "INIT",
+  "substage": "process_cli_options",
+  "message": null,
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.410427+00:00",
+  "level": "ERROR",
+  "event_type": "EXCEPTION",
+  "stage": "INIT",
+  "substage": "process_cli_options",
+  "message": "[Errno 2] No such file or directory: '['",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.410431+00:00",
+  "level": "ERROR",
+  "event_type": "EXCEPTION",
+  "stage": "INIT",
+  "substage": null,
+  "message": "[Errno 2] No such file or directory: '['",
+  "payload": {}
+}
+{
+  "timestamp": "2025-11-03T21:39:41.410434+00:00",
+  "level": "INFO",
+  "event_type": "FAIL",
+  "stage": "LIFECYCLE",
+  "substage": null,
+  "message": "[Errno 2] No such file or directory: '['",
+  "payload": {}
+}
