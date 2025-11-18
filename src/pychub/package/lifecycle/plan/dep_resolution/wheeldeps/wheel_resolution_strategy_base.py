@@ -9,7 +9,7 @@ class WheelResolutionStrategy(ABC):
     precedence: int = 100  # lower value = higher precedence
 
     @abstractmethod
-    def resolve(self, dependency: str, output_dir: Path) -> Path:
+    def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
         Resolve a single dependency as a wheel file on the local file system.
 

@@ -4,12 +4,10 @@ import importlib
 import inspect
 import pkgutil
 from importlib.metadata import entry_points
-from typing import Iterable, Mapping, TypeVar
-
-B = TypeVar("B")  # base strategy type
+from typing import Any, Iterable, Mapping
 
 
-def _builtin_strategy_classes(base: type[B], package_name: str) -> list[type[B]]:
+def _builtin_strategy_classes(base: type, package_name: str) -> list[type]:
     """
     Discover strategy classes living under the given package.
 
@@ -19,7 +17,7 @@ def _builtin_strategy_classes(base: type[B], package_name: str) -> list[type[B]]
     will be collected.
     """
     package = importlib.import_module(package_name)
-    classes: list[type[B]] = []
+    classes: list[type] = []
 
     for _finder, mod_name, _ispkg in pkgutil.walk_packages(
             package.__path__, package.__name__ + "."):
@@ -37,11 +35,11 @@ def _builtin_strategy_classes(base: type[B], package_name: str) -> list[type[B]]
     return classes
 
 
-def _entrypoint_strategy_classes(base: type[B], group: str) -> list[type[B]]:
+def _entrypoint_strategy_classes(base: type, group: str) -> list[type]:
     """
     Discover external strategy classes via entry points.
     """
-    classes: list[type[B]] = []
+    classes: list[type] = []
 
     for ep in entry_points().select(group=group):
         obj = ep.load()
@@ -52,49 +50,45 @@ def _entrypoint_strategy_classes(base: type[B], group: str) -> list[type[B]]:
     return classes
 
 
-def load_strategies(
+def load_strategies_base(
         *,
-        base: type[B],
+        base: type,
         package_name: str,
         entrypoint_group: str,
         ordered_names: Iterable[str] | None = None,
-        precedence_overrides: Mapping[str, int] | None = None) -> list[B]:
+        precedence_overrides: Mapping[str, int] | None = None) -> list[Any]:
     """
-    Generic SPI-style loader.
+    SPI-style loader.
 
-    Returns an ordered list of instantiated strategies (with `base` type).
+    - `base`: abstract or concrete base class/protocol used for issubclass checks
+    - returns: instantiated strategy objects (as `list[Any]`)
 
-    - If `ordered_names` is provided, that order wins.
-    - Otherwise, sort by `precedence` then `name`.
-
-    Assumes each strategy class optionally has:
-
-      - `name: str` (fallback: class name)
-      - `precedence: int` (fallback: 100)
+    Ordering rules:
+      - If `ordered_names` is provided, that explicit order wins.
+      - Remaining strategies are sorted by `precedence` then `name`.
     """
-    # 1) collect all classes
-    classes: list[type[B]] = (
-            _builtin_strategy_classes(base, package_name)
-            + _entrypoint_strategy_classes(base, entrypoint_group)
+    classes: list[type] = (
+            _builtin_strategy_classes(base, package_name) +
+            _entrypoint_strategy_classes(base, entrypoint_group)
     )
 
-    # map for name-based lookup
-    by_name: dict[str, type[B]] = {}
+    # map name -> class
+    by_name: dict[str, type] = {}
     for cls in classes:
         name = getattr(cls, "name", cls.__name__)
         by_name[name] = cls
 
     # explicit order mode
     if ordered_names is not None:
-        instances: list[B] = []
+        instances: list[Any] = []
 
         for name in ordered_names:
-            cls = by_name.pop(name, None)
-            if cls is not None:
-                instances.append(cls())
+            selected = by_name.get(name)
+            if selected is not None:
+                instances.append(selected())
+                del by_name[name]
 
-        # append remaining by precedence so they’re not lost
-        remaining: list[tuple[int, str, B]] = []
+        remaining: list[tuple[int, str, Any]] = []
         for name, cls in by_name.items():
             prec = getattr(cls, "precedence", 100)
             if precedence_overrides and name in precedence_overrides:
@@ -107,7 +101,7 @@ def load_strategies(
         return instances
 
     # precedence-only mode
-    ranked: list[tuple[int, str, B]] = []
+    ranked: list[tuple[int, str, Any]] = []
     for cls in classes:
         name = getattr(cls, "name", cls.__name__)
         prec = getattr(cls, "precedence", 100)

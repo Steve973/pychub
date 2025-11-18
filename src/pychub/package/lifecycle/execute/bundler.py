@@ -26,18 +26,19 @@ def write_chubconfig_file(
         targets: list[str],
         chub_build_dir: Path) -> None:
     build_plan = current_build_plan.get()
+    project = build_plan.project
     chubconfig_model = ChubConfig.from_mapping({
         "name": dist_name,
         "version": dist_ver,
-        "entrypoint": build_plan.project.entrypoint,
-        "includes": build_plan.project.includes or [],
+        "entrypoint": project.entrypoint,
+        "includes": project.includes or [],
         "scripts": {
-            "pre": [n for _, n in build_plan.project.scripts.pre],
-            "post": [n for _, n in build_plan.project.scripts.post]
+            "pre": [n for n in project.pre_scripts],
+            "post": [n for n in project.post_scripts]
         },
         "pinned_wheels": pinned_wheels,
         "compatibility": {"targets": targets},
-        "metadata": build_plan.project.metadata
+        "metadata": project.metadata
     })
     chubconfig_model.validate()
     chubconfig_file = Path(chub_build_dir / CHUBCONFIG_FILENAME).resolve()
@@ -57,7 +58,7 @@ def create_chub_build_dir(wheel_path: str | Path,
     return chub_build_dir
 
 
-def validate_files_exist(files: list[str] | [], context: str) -> None:
+def validate_files_exist(files: list[str], context: str) -> None:
     for file in files:
         src = file.split("::", 1)[0] if "::" in file else file
         path = Path(src).expanduser().resolve()
@@ -66,9 +67,9 @@ def validate_files_exist(files: list[str] | [], context: str) -> None:
 
 
 def validate_chub_structure(chub_build_dir: Path,
-                            post_install_scripts: list[str] | [],
-                            pre_install_scripts: list[str] | [],
-                            included_files: list[str] | []) -> None:
+                            post_install_scripts: list[str],
+                            pre_install_scripts: list[str],
+                            included_files: list[str]) -> None:
     # 1. Ensure the build dir exists and has a .chubconfig
     chubconfig_file = chub_build_dir / CHUBCONFIG_FILENAME
     if not chubconfig_file.exists():
@@ -88,8 +89,8 @@ def validate_chub_structure(chub_build_dir: Path,
 
     # 4. Validate pre- and post-install scripts
     for script_tuple in [("post", post_install_scripts), ("pre", pre_install_scripts)]:
-        script_type, scripts = script_tuple
-        validate_files_exist(scripts, context=f"{script_type}-install")
+        script_type, script_list = script_tuple
+        validate_files_exist(script_list, context=f"{script_type}-install")
 
 
 def prepare_build_dirs(main_wheel_path: Path, chub_path: Path | None) -> tuple[Path, Path, Path]:
@@ -126,7 +127,7 @@ def copy_install_scripts(scripts_dest_dir: Path) -> None:
 
 
 @audit(stage=StageType.EXECUTE, substage="create_chub_archive")
-def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
+def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> None:
     """Create a ZIP-based .chub archive."""
     with zipfile.ZipFile(chub_archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for file_path in sorted(chub_build_dir.rglob("*"), key=lambda p: p.relative_to(chub_build_dir).as_posix()):
@@ -134,7 +135,6 @@ def create_chub_archive(chub_build_dir: Path, chub_archive_path: Path) -> Path:
                 continue
             arcname = file_path.relative_to(chub_build_dir)
             zf.write(file_path, arcname)
-    return chub_archive_path
 
 
 @audit(stage=StageType.EXECUTE, substage="bundle_chub")
@@ -161,7 +161,8 @@ def bundle_chub() -> Path:
         dist_name = project.name
         dist_ver = project.version
     elif project.wheels and len(project.wheels) >= 1:
-        dist_name, dist_ver, *_ = parse_wheel_filename(wheels[0])
+        dist_name, parsed_ver, *_ = parse_wheel_filename(wheels[0])
+        dist_ver = str(parsed_ver)
     else:
         raise ValueError("Missing distribution name and version")
 
@@ -176,8 +177,8 @@ def bundle_chub() -> Path:
     write_chubconfig_file(dist_name, dist_ver, wheels_and_versions, targets, build_dir)
 
     # Assemble .chub archive
-    output_path = build_plan.project.chub or (build_dir / f"{dist_name}-{dist_ver}.chub")
-    output_path = create_chub_archive(build_dir, Path(output_path))
+    output_path = Path(project.chub) if project.chub else (build_dir / f"{dist_name}-{dist_ver}.chub")
+    create_chub_archive(build_dir, Path(output_path))
 
     print(f"Built {output_path}")
     return output_path

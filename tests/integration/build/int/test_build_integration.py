@@ -41,7 +41,6 @@ def built_wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_build_chub_via_project(tmp_path: Path, built_wheel: Path):
     """Direct internal path: ChubProject → build_chub()."""
-    from pychub.package.packager import build_chub
     from pychub.model.chubproject_model import ChubProject
 
     out = tmp_path / "out" / "project-built.chub"

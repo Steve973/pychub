@@ -34,8 +34,10 @@ class ProvenanceEvent(MultiformatSerializableMixin):
 
     @staticmethod
     def from_mapping(m: Mapping[str, Any]) -> "ProvenanceEvent":
+        details_obj = m.get("details") or {}
+        if not isinstance(details_obj, dict):
+            raise TypeError(f"Expected 'details' to be a mapping, got {type(details_obj)!r}")
         return ProvenanceEvent(
             source=SourceKind(m.get("source")),
             operation=OperationKind(m.get("operation")),
-            details=m.get("details")
-        )
+            details=details_obj)

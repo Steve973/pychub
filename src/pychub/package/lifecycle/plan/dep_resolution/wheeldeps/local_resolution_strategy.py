@@ -14,7 +14,7 @@ class LocalResolutionStrategy(WheelResolutionStrategy):
     name = "local"
     precedence = 50
 
-    def resolve(self, dependency: str, output_dir: Path) -> Path:
+    def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
         Given a local wheel path, resolve it and copy it into output_dir.
 
@@ -31,10 +31,10 @@ class LocalResolutionStrategy(WheelResolutionStrategy):
         # Avoid redundant copy if same inode or already identical content
         if dest_path.exists():
             if src_path.samefile(dest_path):
-                return dest_path
+                return [dest_path]
             if src_path.stat().st_size == dest_path.stat().st_size:
                 # optional: verify content hash before skipping
-                return dest_path
+                return [dest_path]
 
         shutil.copy2(src_path, dest_path)
-        return dest_path
+        return [dest_path]

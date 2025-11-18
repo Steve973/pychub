@@ -4,13 +4,14 @@ from pathlib import Path
 
 from ..constants import CHUB_POST_INSTALL_SCRIPTS_DIR, CHUB_PRE_INSTALL_SCRIPTS_DIR, CHUB_SCRIPTS_DIR
 from ..utils import die
+from ...model.scripts_model import ScriptSpec
 
 
-def run_install_scripts(bundle_root: Path, dry_run: bool, script_type: str, scripts: list[str]):
+def run_install_scripts(bundle_root: Path, dry_run: bool, script_type: str, scripts: list[ScriptSpec]):
     script_base = bundle_root / CHUB_SCRIPTS_DIR / script_type
-    scripts.sort()
-    for script in scripts:
-        script_path = (script_base / script).resolve()
+    sorted_scripts = sorted(scripts, key=lambda s: s.src)
+    for script in sorted_scripts:
+        script_path = (script_base / script.src).resolve()
         if not script_path.exists():
             print(f"[warn] {script_type}-install script not found: {script}", file=sys.stderr)
             continue
@@ -26,9 +27,9 @@ def run_install_scripts(bundle_root: Path, dry_run: bool, script_type: str, scri
             die(result.returncode)
 
 
-def run_post_install_scripts(bundle_root: Path, dry_run: bool, scripts: list[str]):
+def run_post_install_scripts(bundle_root: Path, dry_run: bool, scripts: list[ScriptSpec]):
     run_install_scripts(bundle_root, dry_run, CHUB_POST_INSTALL_SCRIPTS_DIR, scripts)
 
 
-def run_pre_install_scripts(bundle_root: Path, dry_run: bool, scripts: list[str]):
+def run_pre_install_scripts(bundle_root: Path, dry_run: bool, scripts: list[ScriptSpec]):
     run_install_scripts(bundle_root, dry_run, CHUB_PRE_INSTALL_SCRIPTS_DIR, scripts)

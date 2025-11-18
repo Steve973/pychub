@@ -12,7 +12,7 @@ class PathResolutionStrategy(WheelResolutionStrategy):
     name = "path"
     precedence = 60
 
-    def resolve(self, dependency: str, output_dir: Path) -> Path:
+    def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
         Given a project path (with a pyproject.toml), collect all nested path
         dependencies and copy their built wheels into output_dir.
@@ -46,4 +46,4 @@ class PathResolutionStrategy(WheelResolutionStrategy):
 
         # For now, return the root project wheel
         # (later the planner may attach all of them)
-        return wheel_paths[0].resolve()
+        return [wheel_paths[0].resolve()]

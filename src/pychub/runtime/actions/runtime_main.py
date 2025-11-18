@@ -57,7 +57,9 @@ def main(argv: list[str] | None = None) -> None:
     else:
         bundle_root = cur_file.resolve().parent
 
-    bundle_config = load_chubconfig(bundle_root) or None
+    bundle_config = load_chubconfig(bundle_root)
+    if bundle_config is None:
+        raise Exception("Failed to load chubconfig")
     libs_dir = (bundle_root / CHUB_LIBS_DIR).resolve()
     baked_entrypoint = bundle_config.entrypoint
 

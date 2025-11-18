@@ -25,7 +25,6 @@ def execute_version():
     except PackageNotFoundError:
         version = "(source)"
     print(f"pychub: {version}")
-    return
 
 
 @audit(StageType.EXECUTE)

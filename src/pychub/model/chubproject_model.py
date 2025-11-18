@@ -8,7 +8,7 @@ from typing import Any, Optional, Mapping
 
 from .chubproject_provenance_model import ProvenanceEvent, SourceKind, OperationKind
 from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
-from ..helper.toml_utils import load_toml_text
+from ..helper.toml_utils import load_toml_text, dump_toml_to_str
 
 
 def _normalize_str_list(value: Any) -> list[str]:
@@ -32,7 +32,7 @@ def _normalize_metadata(value: Any) -> dict[str, Any]:
     raise TypeError(f"metadata must be a mapping, got {type(value)!r}")
 
 
-def _select_package_table(doc: Mapping[str, Any], toml_name: str = None) -> Mapping[str, Any] | None:
+def _select_package_table(doc: Mapping[str, Any], toml_name: str | None = None) -> Mapping[str, Any] | None:
     # 1) if pyproject.toml, exact [tool.pychub.package] in pyproject.toml
     if toml_name == "pyproject.toml":
         pkg = doc.get("tool", {}).get("pychub", {}).get("package")
@@ -47,7 +47,7 @@ def _select_package_table(doc: Mapping[str, Any], toml_name: str = None) -> Mapp
             print("WARNING: [tool.pychub.package] not found in pyproject.toml -- skipping pychub packaging")
             return None
     # 2) exact [tool.pychub.package] [pychub.package] or [package] in chubproject.toml
-    elif re.fullmatch(r".*chubproject.*\.toml", toml_name):
+    elif toml_name and re.fullmatch(r".*chubproject.*\.toml", toml_name):
         pkg = doc.get("tool", doc).get("pychub", doc).get("package")
         if isinstance(pkg, Mapping):
             print(f"INFO: [pychub.package] is enabled in {toml_name} -- using pychub packaging")
@@ -134,15 +134,16 @@ def _parse_metadata_entries(entries: list[str] | None) -> dict[str, list[str]]:
 
     result: dict[str, list[str]] = {}
     for raw in entries:
-        if "=" not in raw:
-            # allow bare keys, treat as an empty list or [""] depending on taste
-            key, values = raw, []
+        raw = raw.strip()
+        # Split into key and the rest once
+        if "=" in raw:
+            key, values_str = raw.split("=", 1)
+            key = key.strip()
+            values_str = values_str.strip()
         else:
-            key, values = raw.split("=", 1)
-        key = key.strip()
-        if not key:
-            continue
-        vals = [v.strip() for v in values.split(",")] if values else []
+            key = raw
+            values_str = ""
+        vals = [v.strip() for v in values_str.split(",")] if values_str else []
         # merge multiple entries for the same key
         bucket = result.setdefault(key, [])
         for v in vals:
@@ -192,7 +193,7 @@ class ChubProject(MultiformatSerializableMixin):
             data: Mapping[str, Any] | None,
             *,
             source: Optional[SourceKind] = None,
-            details: Optional[dict[str, Any]] = None) -> "ChubProject":
+            details: Optional[dict[str, Any]] = None) -> ChubProject:
         data = data or {}
 
         inst = cls(
@@ -420,8 +421,7 @@ class ChubProject(MultiformatSerializableMixin):
         return ChubProject.from_mapping(
             package_mapping,
             source=source,
-            details={"file": str(path)},
-        )
+            details={"file": str(path)})
 
     @staticmethod
     def cli_to_mapping(args: Namespace, other_args: list[str]) -> dict[str, object]:
@@ -469,13 +469,6 @@ class ChubProject(MultiformatSerializableMixin):
           the options mapping is written flat at the root.
         - If `path` exists and `overwrite` is False, raises ChubProjectError.
         """
-        if _TOML_WRITER is None:
-            raise ChubProjectError(
-                "Saving requires a TOML writer. Install one of:\n"
-                "  pip install tomli-w   # preferred\n"
-                "  pip install tomlkit   # also works\n"
-                "  pip install toml      # legacy"
-            )
 
         # accept either a ChubProject or a raw mapping
         if isinstance(project, ChubProject):
@@ -498,6 +491,6 @@ class ChubProject(MultiformatSerializableMixin):
         if make_parents:
             p.parent.mkdir(parents=True, exist_ok=True)
 
-        text = _TOML_WRITER.dumps(_coerce_toml_value(obj))  # type: ignore[attr-defined]
+        text = dump_toml_to_str(_coerce_toml_value(obj))
         p.write_text(text, encoding="utf-8")
         return p

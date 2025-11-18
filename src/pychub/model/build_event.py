@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import datetime
+import functools
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, Optional
+from typing import Any, Optional, ParamSpec, TypeVar
 
 from pychub.helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 from pychub.package.context_vars import current_build_plan
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 # --------------------------------------------------------------------------- #
@@ -56,24 +60,31 @@ class AnnotationType(str, Enum):
     SUPPLEMENTS = "SUPPLEMENTS"  # Adds context or extra data
 
 
-def audit(stage: StageType, substage: str | None = None):
-    def decorator(fn):
-        def wrapper(*args, **kwargs):
+def audit(stage: StageType, substage: str | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(fn: Callable[P, R]) -> Callable[P, R]:
+        @functools.wraps(fn)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             plan = current_build_plan.get()
             if plan is None:
                 raise RuntimeError("No active BuildPlan in context for @audit-decorated function")
+
             plan.audit_log.append(
                 BuildEvent.make(
                     stage,
                     EventType.START,
-                    substage=substage))
+                    substage=substage,
+                )
+            )
+
             try:
                 result = fn(*args, **kwargs)
                 plan.audit_log.append(
                     BuildEvent.make(
                         stage,
                         EventType.COMPLETE,
-                        substage=substage))
+                        substage=substage,
+                    )
+                )
                 return result
             except Exception as e:
                 plan.audit_log.append(
@@ -82,9 +93,13 @@ def audit(stage: StageType, substage: str | None = None):
                         EventType.EXCEPTION,
                         LevelType.ERROR,
                         substage=substage,
-                        message=str(e)))
+                        message=str(e),
+                    )
+                )
                 raise
+
         return wrapper
+
     return decorator
 
 
@@ -135,7 +150,7 @@ class BuildEvent(MultiformatSerializableMixin):
             "level": self.level.value,
             "message": self.message or "",
             "payload": self.payload or {},
-            "stage": self.stage.value,
+            "stage": self.stage.value if self.stage else None,
             "substage": self.substage or "",
             "timestamp": self.timestamp.isoformat(),
         }
@@ -171,7 +186,7 @@ class BuildEvent(MultiformatSerializableMixin):
 
         return BuildEvent(
             annotation_type=annotation_type,
-            event_id=m.get("event_id"),
+            event_id=m.get("event_id", str(uuid.uuid4())),
             event_type=event_type,
             level=level,
             message=m.get("message"),
@@ -179,4 +194,4 @@ class BuildEvent(MultiformatSerializableMixin):
             stage=stage,
             substage=m.get("substage"),
             timestamp=datetime.datetime.fromisoformat(
-                m.get("timestamp",datetime.datetime.now(datetime.timezone.utc).isoformat())))
+                m.get("timestamp", datetime.datetime.now(datetime.timezone.utc).isoformat())))

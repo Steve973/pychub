@@ -63,11 +63,11 @@ class WheelArtifact(MultiformatSerializableMixin):
 
         # Parse filename for name/version/tags
         try:
-            name, version, build, tags = parse_wheel_filename(path.name)
+            name, version, build, tags_set = parse_wheel_filename(path.name)
         except Exception as e:
             raise ValueError(f"Invalid wheel filename: {path.name} ({e})")
 
-        tags = set(tags)
+        tags = set(tags_set)
 
         # Compute hash for reproducibility
         sha = hashlib.sha256()

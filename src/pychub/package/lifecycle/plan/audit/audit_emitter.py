@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from pychub.model.build_event import BuildEvent
+from pychub.model.buildplan_model import BuildPlan
 from pychub.package.context_vars import current_build_plan
 
 _LOG_FILE_NAME = "build.audit.json"
@@ -29,6 +30,7 @@ def configure_emitter(dest: list[str], level: int = logging.INFO) -> logging.Log
     logger.propagate = False
 
     for d in dest:
+        handler: logging.Handler
         if d == "stdout":
             handler = logging.StreamHandler(sys.stdout)
         elif d == "stderr":
@@ -46,6 +48,7 @@ def configure_emitter(dest: list[str], level: int = logging.INFO) -> logging.Log
 
 
 def emit_audit_log(
+        build_plan: BuildPlan,
         dest: str = "file",
         path: Optional[Path] = None,
         indent: int = 2) -> None:
@@ -53,12 +56,14 @@ def emit_audit_log(
     Write the build audit log to a file or stream.
 
     Args:
-        plan: The BuildPlan containing audit events
+        build_plan: The BuildPlan containing audit events
         dest: space separated values of 'stdout', 'stderr', or 'file'
         path: If dest='file', the path to write to (default: <plan.staging_dir>/build.audit.json)
         indent: JSON indentation level
     """
-    build_plan = current_build_plan.get()
+    build_plan = build_plan or current_build_plan.get()
+    if not build_plan:
+        raise ValueError("No build plan found; cannot emit audit log")
     dests = []
     for d in dest.split(" "):
         if d == "file" and path is None:

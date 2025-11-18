@@ -39,7 +39,7 @@ def collect_path_dependencies(
     else:
         strat = claimed[0]
 
-    label = strat.label()
+    label = strat.name
     seen[project_root] = label
 
     dep_paths = strat.extract_paths(data, project_root)

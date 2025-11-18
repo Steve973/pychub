@@ -24,23 +24,17 @@ def list_wheels(bundle_root: Path, *, quiet: bool = False, verbose: bool = False
     cfg = load_chubconfig(bundle_root)
 
     # Preferred: read the resolved closure from the config
-    if cfg and cfg.wheels:
+    if cfg and cfg.pinned_wheels:
         lines: list[str] = []
         if quiet:
-            for wheel, deps in cfg.wheels.items():
-                lines.append(f"w:{wheel}, d:{len(deps)}")
+            for wheel in cfg.pinned_wheels:
+                lines.append(f"w:{wheel}")
         else:
-            for wheel, deps in cfg.wheels.items():  # preserves insertion order
+            for wheel in cfg.pinned_wheels:  # preserves insertion order
                 if verbose:
                     lines.append(f"Wheel: {wheel}")
-                    if deps:
-                        lines.append("  Deps:")
-                        for dep in deps:
-                            lines.append(f"  - {dep}")
                 else:
                     lines.append(f"{wheel}")
-                    for dep in deps:
-                        lines.append(f"{dep}")
         if lines:
             _print_lines(lines)
         elif not quiet:

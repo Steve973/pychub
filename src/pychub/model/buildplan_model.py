@@ -11,6 +11,9 @@ from appdirs import user_cache_dir
 
 from pychub.model.chubproject_model import ChubProject
 from .build_event import BuildEvent
+from .includes_model import Includes
+from .scripts_model import Scripts
+from .wheels_model import WheelCollection
 from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 from ..package.constants import CHUB_INCLUDES_DIR, CHUB_SCRIPTS_DIR, RUNTIME_DIR, CHUB_BUILD_DIR, CHUB_LIBS_DIR, \
     CHUBCONFIG_FILENAME, CHUB_WHEELS_DIR
@@ -32,6 +35,12 @@ class BuildPlan(MultiformatSerializableMixin):
     cache_root: Path = field(default_factory=Path)
     # When the build plan was created
     created_at: datetime.datetime = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+    # Included files to be staged in the build
+    include_files: Includes = field(default_factory=Includes)
+    # Scripts to be staged in the build
+    install_scripts: Scripts = field(default_factory=Scripts)
+    # Wheels to be staged in the build
+    wheels: WheelCollection = field(default_factory=WheelCollection)
     # Additional metadata for the build
     metadata: dict[str, Any] = field(default_factory=dict)
     # The ChubProject definition

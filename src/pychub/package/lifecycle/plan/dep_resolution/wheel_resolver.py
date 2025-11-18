@@ -39,7 +39,7 @@ def _resolve_spec_with_strategies(
         spec: str,
         output_dir: Path,
         strategies: list[WheelResolutionStrategy],
-        substage: str = "resolve_wheels") -> Path:
+        substage: str = "resolve_wheels") -> list[Path]:
     """
     Ask each strategy in order to resolve a given spec (path or requirement)
     into a concrete wheel on disk, logging failures into the audit log.
@@ -49,8 +49,7 @@ def _resolve_spec_with_strategies(
 
     for strat in strategies:
         try:
-            resolved = strat.resolve(spec, output_dir)
-            return Path(resolved).expanduser().resolve()
+            return [Path(r).expanduser().resolve() for r in strat.resolve(spec, output_dir)]
         except Exception as ex:
             last_exc = ex
             if plan is not None:
@@ -76,7 +75,7 @@ def _resolve_spec_with_strategies(
 
 @audit(StageType.PLAN, "resolve_wheels")
 def resolve_wheels_for_project(
-        project_wheels: list[str | Path],
+        project_wheels: list[str],
         output_dir: Path,
         strategies: list[WheelResolutionStrategy] | None = None) -> dict[str, WheelArtifact]:
     """
@@ -102,8 +101,8 @@ def resolve_wheels_for_project(
     # Seed stack from project_wheels (CLI or chubproject options)
     for spec in project_wheels:
         spec_str = str(spec)
-        wheel_path = _resolve_spec_with_strategies(spec_str, output_dir, strategies)
-        stack.append((wheel_path, True))
+        for wheel_path in _resolve_spec_with_strategies(spec_str, output_dir, strategies):
+            stack.append((wheel_path, True))
 
     artifacts_by_name: dict[str, WheelArtifact] = {}
     seen_names: set[str] = set()
@@ -143,8 +142,8 @@ def resolve_wheels_for_project(
                 continue
 
             # Resolve dependency with the same strategies
-            dep_path = _resolve_spec_with_strategies(str(req), output_dir, strategies)
-            # Mark as dependency (not primary root)
-            stack.append((dep_path, False))
+            for dep_path in _resolve_spec_with_strategies(str(req), output_dir, strategies):
+                # Mark as dependency (not primary root)
+                stack.append((dep_path, False))
 
     return artifacts_by_name

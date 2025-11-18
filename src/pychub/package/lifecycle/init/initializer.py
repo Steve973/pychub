@@ -7,7 +7,6 @@ from pathlib import Path
 
 from appdirs import user_cache_dir
 
-from pychub.helper.sys_check_utils import check_python_version, verify_pip
 from pychub.model.build_event import audit, BuildEvent, StageType, EventType
 from pychub.model.chubproject_model import ChubProject
 from pychub.model.chubproject_provenance_model import SourceKind
@@ -24,7 +23,7 @@ def check_immediate_operations(args: Namespace, chubproject: ChubProject) -> boo
        that the program can continue."""
     build_plan = current_build_plan.get()
     if args.analyze_compatibility:
-        executor.execute_analyze_compatibility(build_plan, chubproject)
+        executor.execute_analyze_compatibility(chubproject)
         build_plan.audit_log.append(
             BuildEvent.make(
                 StageType.INIT,
@@ -80,7 +79,7 @@ def cache_project(chubproject: ChubProject) -> Path:
 
 
 @audit(StageType.INIT, "parse_chubproject")
-def process_chubproject(chubproject_path: Path) -> ChubProject | None:
+def process_chubproject(chubproject_path: Path) -> ChubProject:
     if not chubproject_path.is_file():
         raise FileNotFoundError(f"Chub project file not found: {chubproject_path}")
     return ChubProject.load_from_toml(chubproject_path)
@@ -97,12 +96,12 @@ def process_options(args, other_args) -> ChubProject:
             cli_mapping,
             source=SourceKind.CLI,
             details=cli_details)
+        return chubproject
     else:
-        chubproject = ChubProject.from_mapping(
+        return ChubProject.from_mapping(
             cli_mapping,
             source=SourceKind.CLI,
             details=cli_details)
-    return chubproject
 
 
 @audit(StageType.INIT, "parse_cli")
@@ -113,8 +112,6 @@ def parse_cli() -> tuple[Namespace, list[str]]:
 
 @audit(StageType.INIT)
 def init_project(chubproject_path: Path | None = None) -> tuple[Path, bool]:
-    check_python_version()
-    verify_pip()
     build_plan = current_build_plan.get()
     namespace, other_args = parse_cli()
     if chubproject_path:

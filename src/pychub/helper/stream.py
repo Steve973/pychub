@@ -1,5 +1,6 @@
 from functools import reduce as _reduce
 from itertools import islice, tee, groupby
+from typing import Any
 
 
 class Stream:
@@ -18,7 +19,12 @@ class Stream:
 
     def distinct(self):
         seen = set()
-        return Stream(x for x in self._it if x not in seen and not seen.add(x))
+
+        def mark_seen(x: Any) -> bool:
+            seen.add(x)
+            return True
+
+        return Stream(x for x in self._it if x not in seen and mark_seen(x))
 
     def peek(self, fn):
         def generator():

@@ -205,12 +205,22 @@ class WheelInfo(MultiformatSerializableMixin):
         wheel = _select_fields(wheel_hdrs, WHEEL_SELECTORS)
 
         # Prefer selector results; hard-require Name/Version from METADATA
-        name = (meta.pop("name", None) or _select_one(meta_hdrs, ("Name",)))
-        version = (meta.pop("version", None) or _select_one(meta_hdrs, ("Version",)))
-        if not name or not version:
+        name_val = meta.pop("name", None) or _select_one(meta_hdrs, ("Name",))
+        version_val = meta.pop("version", None) or _select_one(meta_hdrs, ("Version",))
+
+        if not name_val or not version_val:
             raise ValueError(f"{p.name}: METADATA missing Name/Version")
 
-        tags = list(wheel.get("tag") or [])  # already list
+        name = str(name_val)
+        version = str(version_val)
+
+        tag_obj = wheel.get("tag")
+        if isinstance(tag_obj, list):
+            tags = [str(x) for x in tag_obj]
+        elif tag_obj is not None:
+            tags = [str(tag_obj)]
+        else:
+            tags = []
         rp = meta.pop("requires_python", None)
         requires_python = str(rp) if rp is not None else None
         extras = ExtrasInfo.from_metadata(meta)

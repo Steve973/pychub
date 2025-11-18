@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Sequence
 
 from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 
@@ -24,7 +23,7 @@ class IncludeSpec(MultiformatSerializableMixin):
         return self.dest or self.src.name
 
     @staticmethod
-    def parse(item: str | Mapping[str, Any], *, base_dir: Path = os.getcwd()) -> "IncludeSpec":
+    def parse(item: str | Mapping[str, Any], *, base_dir: Path = Path.cwd()) -> IncludeSpec:
         if isinstance(item, str):
             if "::" in item:
                 s, d = item.split("::", 1)
@@ -69,7 +68,7 @@ class Includes(MultiformatSerializableMixin):
     _items: list[IncludeSpec] = field(default_factory=list)
 
     @staticmethod
-    def from_toml(items: list[str | Mapping[str, Any]] | None, *, base_dir: Path) -> "Includes":
+    def from_toml(items: Sequence[str | Mapping[str, Any]] | None, *, base_dir: Path) -> Includes:
         if not items:
             return Includes()
         return Includes([IncludeSpec.parse(x, base_dir=base_dir) for x in items])
