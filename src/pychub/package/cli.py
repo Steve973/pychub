@@ -1,14 +1,27 @@
 from __future__ import annotations
 
-import argparse
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter, REMAINDER
 from pathlib import Path
 
 
-def create_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+def create_arg_parser() -> ArgumentParser:
+    """
+    Creates and configures an argument parser for the pychub command-line interface.
+
+    The argument parser is initialized with the program name, a short description of the tool,
+    and a formatter for help messages. It provides various command-line options for configuring
+    the behavior and execution of the tool during runtime.
+
+    Returns:
+        ArgumentParser: An ArgumentParser object configured with all necessary options.
+
+    Raises:
+        Any raised error from ArgumentParser methods.
+    """
+    parser = ArgumentParser(
         prog="pychub",
         description="package a wheel and its dependencies into a .chub archive",
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=RawTextHelpFormatter)
 
     parser.add_argument(
         "--analyze-compatibility",
@@ -38,7 +51,7 @@ def create_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--entrypoint-args",
-        nargs=argparse.REMAINDER,
+        nargs=REMAINDER,
         type=str,
         default=[],
         metavar="ARG",
@@ -132,3 +145,23 @@ def create_arg_parser() -> argparse.ArgumentParser:
             " - can be repeated or space-separated"))
 
     return parser
+
+
+def parse_cli(argv: list[str] | None = None) -> Namespace:
+    """
+    Parses command-line arguments using a predefined argument parser.
+
+    This function uses the `create_arg_parser` function to initialize an argument parser
+    and then processes the provided command-line arguments to extract and return them
+    in a structured `Namespace` format.
+
+    Args:
+        argv (list[str] | None): A list of command-line arguments to parse, or `None`
+            to use `sys.argv` by default.
+
+    Returns:
+        Namespace: An object containing the parsed command-line arguments
+            as attributes.
+    """
+    parser = create_arg_parser()
+    return parser.parse_args(argv)

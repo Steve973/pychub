@@ -20,9 +20,28 @@ class IndexResolutionStrategy(WheelResolutionStrategy):
     def fetch_all_wheel_variant_urls(
             requirement: str,
             index_url: str = "https://pypi.org/pypi") -> list[str]:
-        """
-        Given a requirement (e.g. 'torch==2.2.0'), fetch all matching wheel URLs
-        from the specified index. If no version constraint is given, fetch the latest release.
+        """Fetch all wheel variant URLs for a given requirement from an index URL.
+
+        This static method retrieves a list of URLs for the wheel variant distributions
+        of a specified Python package requirement. It optionally allows the use of a
+        custom index URL, with a default set to the PyPI primary URL. The method parses
+        the requirement, fetches the package metadata from the index, and matches compatible
+        releases based on the given version specifier.
+
+        Args:
+            requirement (str): The Python package requirement in PEP 508 format. This
+                includes an optional version specifier to filter compatible distributions.
+            index_url (str, optional): The base URL of the package index from which to
+                fetch metadata. Defaults to "https://pypi.org/pypi".
+
+        Returns:
+            list[str]: A list of URLs corresponding to the wheel distributions (.whl) of
+                the specified package and release versions compatible with the requirement.
+
+        Raises:
+            ValueError: If the provided requirement string cannot be parsed.
+            RuntimeError: If fetching metadata from the index fails or if no matching
+                wheel distributions are found for the requirement.
         """
         try:
             req = Requirement(requirement)
@@ -65,6 +84,23 @@ class IndexResolutionStrategy(WheelResolutionStrategy):
 
     @staticmethod
     def _version_matches(ver_str: str, req: Requirement) -> bool:
+        """Check if a version string matches a given requirement.
+
+        The method determines whether the provided version string satisfies the
+        specifier requirements defined by the given `Requirement`. If the version
+        string cannot be parsed into a `Version` object or does not meet the
+        requirements, the method will return False.
+
+        Args:
+            ver_str (str): The version string to validate.
+            req (Requirement): The requirement containing the specifier to validate
+                against.
+
+        Returns:
+            bool: True if the version string satisfies the requirement or has no
+            specifier. False if the version string is invalid or does not satisfy
+            the requirement.
+        """
         try:
             ver = Version(ver_str)
         except InvalidVersion:
@@ -73,8 +109,19 @@ class IndexResolutionStrategy(WheelResolutionStrategy):
 
     def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
-        Download all available wheel variants for a given dependency into output_dir.
-        Returns a list of downloaded .whl Paths.
+        Resolves and downloads all wheel (.whl) variants for a given dependency into the specified
+        output directory using pip. It compares the state of the output directory before and after
+        the download to identify newly downloaded wheels.
+
+        Args:
+            dependency (str): The name of the dependency for which wheel variants are to be downloaded.
+            output_dir (Path): The directory where the wheel files will be downloaded.
+
+        Returns:
+            list[Path]: A sorted list of Paths to the newly downloaded wheel files.
+
+        Raises:
+            RuntimeError: If the `pip download` command fails or no wheel files are downloaded.
         """
         output_dir.mkdir(parents=True, exist_ok=True)
         before = set(output_dir.glob("*.whl"))

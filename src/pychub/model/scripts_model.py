@@ -31,7 +31,7 @@ class ScriptSpec(MultiformatSerializableMixin):
     @staticmethod
     def from_mapping(m: Mapping[str, Any] | None) -> "ScriptSpec":
         if not m:
-            return ScriptSpec(Path(), ScriptType.PRE)
+            raise ValueError("Empty script mapping")
         src = Path(m["src"])
         script_type = ScriptType(m["script_type"])
         return ScriptSpec(src, script_type)

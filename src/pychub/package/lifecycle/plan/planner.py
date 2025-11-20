@@ -16,9 +16,26 @@ from pychub.package.lifecycle.plan.resource_resolution.resource_resolver import 
 @audit(StageType.PLAN)
 def plan_build(cache_dir: Path, strategies: list[WheelResolutionStrategy] | None = None, /) -> Path:
     """
-    Generate and persist a BuildPlan for the ChubProject in cache_dir.
+    Constructs and persists a build plan based on the current build configuration.
 
-    Each strategy handles one resolution approach (path, index, native builder...).
+    This function stages runtime resources needed for building a project,
+    including resolving wheels, pre-install scripts, post-install scripts,
+    and included files. Once all resources are prepared, the build plan is
+    saved as a JSON file in the provided cache directory.
+
+    NOTE: If the user (or project config) explicitly specifies a wheel,
+    script, or include, then failure to resolve it is a hard error.
+
+    Args:
+        cache_dir (Path): The directory where the build plan and related resources
+            will be stored.
+        strategies (list[WheelResolutionStrategy] | None): An optional list of
+            strategies for resolving project wheels. If None, the default strategies
+            will be applied. When None, the wheel resolver will use its
+            registered/discovered strategies.
+
+    Returns:
+        Path: The path to the persisted build plan JSON file.
     """
     build_plan = current_build_plan.get()
     project = build_plan.project

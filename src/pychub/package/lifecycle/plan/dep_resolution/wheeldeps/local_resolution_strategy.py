@@ -16,9 +16,16 @@ class LocalResolutionStrategy(WheelResolutionStrategy):
 
     def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
-        Given a local wheel path, resolve it and copy it into output_dir.
+        Resolves a dependency by copying it to the specified output directory. This function ensures
+        that the file is correctly stored in the target location without redundant operations if the
+        file already exists and is identical.
 
-        Returns the path to the wheel within output_dir.
+        Args:
+            dependency (str): The path to the dependency file (e.g., local wheel file) to be resolved.
+            output_dir (Path): The directory path where the dependency will be copied.
+
+        Returns:
+            list[Path]: A list containing the path of the resolved/copied dependency file.
         """
         src_path = Path(dependency).expanduser().resolve()
         if not src_path.is_file():

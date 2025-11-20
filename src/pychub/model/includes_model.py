@@ -86,3 +86,7 @@ class Includes(MultiformatSerializableMixin):
 
     def resolved_dests(self, includes_dir: Path) -> list[Path]:
         return [i.resolved_dest(includes_dir) for i in self._items]
+
+    @property
+    def items(self):
+        return self._items

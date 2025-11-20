@@ -14,10 +14,25 @@ class PathResolutionStrategy(WheelResolutionStrategy):
 
     def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
-        Given a project path (with a pyproject.toml), collect all nested path
-        dependencies and copy their built wheels into output_dir.
+        Resolves a dependency and copies relevant wheel files to the output directory.
 
-        Returns the path to the root project's wheel.
+        This method identifies the dependencies of a given project via its
+        pyproject.toml file, collects wheel files from all associated paths, and
+        places these wheel files into the defined output directory.
+
+        Args:
+            dependency (str): The path to the project or the `pyproject.toml` file
+                containing the dependency definitions.
+            output_dir (Path): The directory where the resolved wheel files will be
+                copied.
+
+        Returns:
+            list[Path]: A list of resolved absolute paths for the wheel files.
+
+        Raises:
+            FileNotFoundError: If no `pyproject.toml` file is found at the specified
+                dependency path.
+            RuntimeError: If no wheel files are found in the path dependencies.
         """
         output_dir.mkdir(parents=True, exist_ok=True)
 

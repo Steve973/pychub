@@ -16,18 +16,37 @@ from packaging.version import Version
 from pychub.helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 from .wheelinfo_model import WheelInfo
 
+UNORDERED: int = 1_000_000
+
+
+@dataclass(frozen=True)
+class WheelId(MultiformatSerializableMixin):
+    name: str  # normalized dist name
+    version: str  # normalized version
+    tag_triple: str  # like "cp312-manylinux_2_28_x86_64"
+
+    def to_mapping(self) -> dict[str, str]:
+        return {
+            "name": self.name,
+            "version": self.version,
+            "tag_triple": self.tag_triple,
+        }
+
+    def __str__(self) -> str:
+        return f"{self.name}-{self.version}-{self.tag_triple}"
+
 
 class WheelSourceType(str, Enum):
-    PATH = "PATH"        # Supplied from the local filesystem
+    PATH = "PATH"  # Supplied from the local filesystem
     PROJECT = "PROJECT"  # Found as a dependency of another local wheel
-    PYPI = "PYPI"        # Downloaded from PyPI
-    BUILT = "BUILT"      # Locally built artifact
+    PYPI = "PYPI"  # Downloaded from PyPI
+    BUILT = "BUILT"  # Locally built artifact
 
 
 class WheelRoleType(str, Enum):
-    PRIMARY = "PRIMARY"        # The main subject of the build
+    PRIMARY = "PRIMARY"  # The main subject of the build
     DEPENDENCY = "DEPENDENCY"  # Required by the primary wheel
-    INCLUDED = "INCLUDED"      # Extra wheel intentionally bundled
+    INCLUDED = "INCLUDED"  # Extra wheel intentionally bundled
 
 
 @dataclass
@@ -40,6 +59,7 @@ class WheelArtifact(MultiformatSerializableMixin):
     dependencies: list["WheelArtifact"] = field(default_factory=list)
     source: WheelSourceType | None = None
     role: WheelRoleType | None = None
+    order: int = UNORDERED
     hash: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -49,11 +69,12 @@ class WheelArtifact(MultiformatSerializableMixin):
 
     @classmethod
     def from_path(
-        cls,
-        path: Path,
-        *,
-        is_primary: bool = False,
-        source: WheelSourceType | str = WheelSourceType.PATH) -> WheelArtifact:
+            cls,
+            path: Path,
+            *,
+            is_primary: bool = False,
+            source: WheelSourceType | str = WheelSourceType.PATH,
+            order: int = UNORDERED) -> WheelArtifact:
         """
         Load metadata, dependencies, and tags from a wheel file.
         """
@@ -87,6 +108,7 @@ class WheelArtifact(MultiformatSerializableMixin):
             requires=requires,
             source=WheelSourceType(source) if not isinstance(source, WheelSourceType) else source,
             role=WheelRoleType.PRIMARY if is_primary else WheelRoleType.DEPENDENCY,
+            order=order,
             hash=wheel_hash,
             metadata=metadata)
 
@@ -96,7 +118,8 @@ class WheelArtifact(MultiformatSerializableMixin):
             info: WheelInfo,
             *,
             is_primary: bool = False,
-            source: WheelSourceType | str = WheelSourceType.PATH) -> "WheelArtifact":
+            source: WheelSourceType | str = WheelSourceType.PATH,
+            order: int = UNORDERED) -> "WheelArtifact":
         """
         Build a WheelArtifact directly from a pre-parsed WheelInfo.
         This bypasses ZIP parsing when the wheel's metadata has already been
@@ -123,6 +146,7 @@ class WheelArtifact(MultiformatSerializableMixin):
             requires=requires,
             source=wheel_source,
             role=wheel_role,
+            order=order,
             hash=info.sha256,
             metadata=info.meta)
 
@@ -179,6 +203,7 @@ class WheelArtifact(MultiformatSerializableMixin):
             "requires": self.requires,
             "source": self.source,
             "role": self.role,
+            "order": self.order,
             "metadata": self.metadata,
         }
 
@@ -217,6 +242,16 @@ class WheelCollection(MultiformatSerializableMixin):
     @property
     def sources(self) -> set:
         return {w.source for w in self._wheels if w.source is not None}
+
+    @property
+    def ordered(self):
+        return sorted(
+            self._wheels,
+            key=lambda w: (
+                UNORDERED if w.order is None
+                             or w.order < 0
+                else w.order,
+                w.name))
 
     @property
     def all_tag_sets(self) -> list[set[Tag]]:

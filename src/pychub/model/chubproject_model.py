@@ -424,7 +424,7 @@ class ChubProject(MultiformatSerializableMixin):
             details={"file": str(path)})
 
     @staticmethod
-    def cli_to_mapping(args: Namespace, other_args: list[str]) -> dict[str, object]:
+    def cli_to_mapping(args: Namespace) -> dict[str, object]:
         """
         Normalize argparse.Namespace into the ChubProject.from_mapping() shape.
         Field names match the ChubProject dataclass fields.
@@ -445,8 +445,7 @@ class ChubProject(MultiformatSerializableMixin):
             "include_chubs": args.include_chub or [],
             "pre_scripts": args.pre_script or [],
             "post_scripts": args.post_script or [],
-            # we keep using the “extra args” as entrypoint_args, like before
-            "entrypoint_args": other_args or [],
+            "entrypoint_args": args.entrypoint_args or [],
 
             # metadata as a dict
             "metadata": _parse_metadata_entries(args.metadata_entry),

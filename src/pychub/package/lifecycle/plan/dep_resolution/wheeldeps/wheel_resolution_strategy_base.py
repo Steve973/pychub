@@ -11,15 +11,21 @@ class WheelResolutionStrategy(ABC):
     @abstractmethod
     def resolve(self, dependency: str, output_dir: Path) -> list[Path]:
         """
-        Resolve a single dependency as a wheel file on the local file system.
+        An abstract base class that defines the interface for resolving a dependency
+        to its concrete output paths. Subclasses are expected to implement the abstract
+        method `resolve` to provide specific resolution behavior.
 
         Args:
-            dependency: Canonicalized dependency name (e.g. "requests>=2.0").
-            output_dir: Directory where the resolved wheel should be placed.
+            dependency (str): The dependency identifier or name that needs to be
+                resolved.
+            output_dir (Path): The directory where the resolved dependencies should
+                be placed.
 
         Returns:
-            Absolute Path to the resolved wheel (.whl).
+            list[Path]: A list of resolved file paths for the given dependency.
+
         Raises:
-            ResolutionError if the dependency could not be satisfied.
+            NotImplementedError: If the `resolve` method is not implemented by a
+                subclass.
         """
         raise NotImplementedError

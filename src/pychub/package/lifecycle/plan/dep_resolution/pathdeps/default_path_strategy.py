@@ -4,10 +4,21 @@ from .project_path_strategy_base import ProjectPathStrategy
 
 
 class DefaultProjectPathStrategy(ProjectPathStrategy):
-    """Fallback: scan all dicts for keys containing 'depend' (but don't recurse into values of those keys)."""
+    """
+    Provides a default strategy for determining project paths.
+
+    This class implements a default mechanism for extracting project paths based
+    on provided project data and a project root. It uses a specific precedence
+    and always claims to handle the data passed to it.
+
+    Attributes:
+        name (str): The name of the strategy.
+        precedence (int): The precedence level of the strategy. A lower value
+            indicates higher precedence.
+    """
 
     name = "default"
-    precedence = 1000
+    precedence = 1000  # lower value = higher precedence
 
     @staticmethod
     def can_handle(data: dict) -> bool:
@@ -35,7 +46,8 @@ class DefaultProjectPathStrategy(ProjectPathStrategy):
             if not isinstance(obj, dict):
                 return
             for key, value in obj.items():
-                if isinstance(key, str) and "depend" in key.lower():
+                k = key.lower()
+                if "dependenc" in k or k.endswith("deps"):
                     _extract_from_deps(value)
                     # Do NOT recurse into value (don't go inside dependencies)
                 elif isinstance(value, dict):

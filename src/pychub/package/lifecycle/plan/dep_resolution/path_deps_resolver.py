@@ -13,8 +13,28 @@ def collect_path_dependencies(
         seen: dict[Path, str] | None = None,
         depth: int = 0) -> dict[Path, str]:
     """
-    Recursively collect all project roots for path dependencies, mapped to
-    the strategy label that handled them (e.g. "Poetry", "Hatch", "PDM", "Default").
+    Collects and resolves path dependencies for a project by analyzing its
+    pyproject.toml file and applying appropriate strategies.
+
+    This function iteratively inspects the specified pyproject.toml file and
+    recursively resolves dependencies based on the project structure. It supports
+    multiple path resolution strategies and ensures each unique project root is
+    processed only once.
+
+    Args:
+        pyproject_path (Path): The path to the pyproject.toml file to process.
+        seen (dict[Path, str] | None): A dictionary to track already processed
+            project roots and their corresponding resolution strategy labels. If
+            None, a new dictionary will be initialized.
+        depth (int): The current recursion depth used for logging purposes.
+
+    Returns:
+        dict[Path, str]: A dictionary containing resolved project roots as keys
+        and their corresponding strategy labels as values.
+
+    Raises:
+        RuntimeError: If multiple strategies match the same project root.
+        FileNotFoundError: If a discovered dependency lacks a pyproject.toml file.
     """
     if seen is None:
         seen = {}
@@ -43,7 +63,6 @@ def collect_path_dependencies(
     seen[project_root] = label
 
     dep_paths = strat.extract_paths(data, project_root)
-    print(f"{'  ' * depth}[{label:<6}] {project_root.name} -> {len(dep_paths)} deps")
 
     for dep_path in dep_paths:
         dep_py = dep_path / "pyproject.toml"
