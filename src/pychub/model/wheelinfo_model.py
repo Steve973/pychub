@@ -64,13 +64,13 @@ class SourceInfo(MultiformatSerializableMixin):
 @dataclass(slots=True, frozen=True)
 class ExtrasInfo(MultiformatSerializableMixin):
     """
-    Mapping of extra name -> list of requirement specs (e.g., {'tests': ['pytest>=7', ...]}).
+    Mapping of 'extra name' -> 'list of requirement specs' (e.g., {'tests': ['pytest>=7', ...]}).
     """
     extras: dict[str, list[str]]
 
     # ---------- constructors ----------
     @staticmethod
-    def from_metadata(meta: Mapping[str, Any]) -> "ExtrasInfo":
+    def from_metadata(meta: Mapping[str, Any]) -> ExtrasInfo:
         """
         Build from a wheel's METADATA mapping:
           - meta['provides_extra'] can be str | [str, ...]
@@ -82,12 +82,12 @@ class ExtrasInfo(MultiformatSerializableMixin):
         return ExtrasInfo.from_lists(provides, requires)
 
     @staticmethod
-    def from_mapping(m: Mapping[str, list[str]]) -> "ExtrasInfo":
+    def from_mapping(m: Mapping[str, list[str]]) -> ExtrasInfo:
         return ExtrasInfo(extras={k: list(v) for k, v in (m or {}).items()})
 
     @staticmethod
     def from_lists(provides_extra: Iterable[str] | None,
-                   requires_dist: Iterable[str] | None) -> "ExtrasInfo":
+                   requires_dist: Iterable[str] | None) -> ExtrasInfo:
         """
         Low-level constructor if you've already split values.
         """
@@ -101,7 +101,7 @@ class ExtrasInfo(MultiformatSerializableMixin):
             spec, marker = _split_req_marker(r)
             name = _extract_extra_name(marker)
             if name is None:
-                # no `extra == '...':` -> base dep; ignore for extras mapping
+                # no `extra == '...':` -> base dep; ignore for the "extras" mapping
                 # (if you want base deps later, track them in a separate field)
                 continue
             _append_dedup(buckets[name], spec)
@@ -149,29 +149,26 @@ class WheelInfo(MultiformatSerializableMixin):
     wheel: dict[str, Any] = field(default_factory=dict)  # normalized WHEEL
 
     def to_mapping(self) -> dict[str, Any]:
-        out: dict[str, Any] = {
+        out = {
             "name": self.name,
             "version": self.version,
             "sha256": self.sha256,
             "size": self.size,
-            "tags": list(self.tags),
+            "tags": list(self.tags)
         }
-        if self.requires_python:
-            out["requires_python"] = self.requires_python
-        if self.deps:
-            out["deps"] = list(self.deps)
-        if self.extras:
-            out["extras"] = self.extras.to_mapping()
-        if self.source:
-            out["source"] = self.source.to_mapping()
-        if self.meta:
-            out["meta"] = dict(self.meta)
-        if self.wheel:
-            out["wheel"] = dict(self.wheel)
+        ext = {
+            "requires_python": self.requires_python,
+            "deps": self.deps and list(self.deps),
+            "extras": self.extras and self.extras.to_mapping(),
+            "source": self.source and self.source.to_mapping(),
+            "meta": self.meta and dict(self.meta),
+            "wheel": self.wheel and dict(self.wheel)
+        }
+        out.update({name: value for name, value in ext.items() if value})
         return out
 
     @staticmethod
-    def from_mapping(filename: str, m: Mapping[str, Any]) -> "WheelInfo":
+    def from_mapping(filename: str, m: Mapping[str, Any]) -> WheelInfo:
         return WheelInfo(
             filename=filename,
             name=str(m.get("name", "")),
@@ -192,7 +189,7 @@ class WheelInfo(MultiformatSerializableMixin):
             path: str | Path,
             *,
             deps: Iterable[str] | None = None,
-            source: SourceInfo | None = None) -> "WheelInfo":
+            source: SourceInfo | None = None) -> WheelInfo:
         p = Path(path)
         size = p.stat().st_size
         sha256 = _sha256_file(p)

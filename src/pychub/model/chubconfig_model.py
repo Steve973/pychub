@@ -7,11 +7,12 @@ from typing import Any, Mapping, Optional
 import yaml
 
 from pychub.model.scripts_model import Scripts
+from ..helper.multiformat_deserializable_mixin import MultiformatDeserializableMixin
 from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 
 
 @dataclass(slots=True, frozen=True)
-class ChubConfig(MultiformatSerializableMixin):
+class ChubConfig(MultiformatSerializableMixin, MultiformatDeserializableMixin):
     name: str
     version: str
     entrypoint: Optional[str] = None
@@ -21,16 +22,16 @@ class ChubConfig(MultiformatSerializableMixin):
     targets: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    @staticmethod
-    def from_mapping(m: Mapping[str, Any]) -> "ChubConfig":
-        name = str(m.get("name", "")).strip()
-        version = str(m.get("version", "")).strip()
-        entrypoint = m.get("entrypoint")
-        includes = [str(x) for x in (m.get("includes") or [])]
-        scripts = Scripts.from_mapping(m.get("scripts"))
-        pinned_wheels = [str(x) for x in (m.get("pinned_wheels") or [])]
-        targets = [str(x) for x in (m.get("targets") or [])]
-        metadata = dict(m.get("metadata") or {})
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any], **_: Any) -> ChubConfig:
+        name = str(mapping.get("name", "")).strip()
+        version = str(mapping.get("version", "")).strip()
+        entrypoint = mapping.get("entrypoint")
+        includes = [str(x) for x in (mapping.get("includes") or [])]
+        scripts = Scripts.from_mapping(mapping.get("scripts"))
+        pinned_wheels = [str(x) for x in (mapping.get("pinned_wheels") or [])]
+        targets = [str(x) for x in (mapping.get("targets") or [])]
+        metadata = dict(mapping.get("metadata") or {})
 
         cfg = ChubConfig(
             name=name,
@@ -43,19 +44,6 @@ class ChubConfig(MultiformatSerializableMixin):
             metadata=metadata)
         cfg.validate()
         return cfg
-
-    @classmethod
-    def from_yaml(cls, s: str) -> "ChubConfig":
-        if yaml is None:
-            raise RuntimeError("PyYAML not installed")
-        obj = next(iter(yaml.safe_load_all(s)), None) or {}
-        return cls.from_mapping(obj)
-
-    @classmethod
-    def from_file(cls, path: str | Path) -> "ChubConfig":
-        p = Path(path)
-        text = p.read_text(encoding="utf-8")
-        return cls.from_yaml(text)
 
     def to_mapping(self) -> dict[str, Any]:
         return {

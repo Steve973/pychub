@@ -64,6 +64,9 @@ pychub = "pychub.package.cli:main"
 
 [tool.poetry]
 packages = [{ include = "pychub", from = "src" }]
+include = [
+    { path = "pychub/package/lifecycle/plan/compatibility/compatibility_spec.toml", format = ["sdist", "wheel"] }
+]
 
 [tool.poetry.dependencies]
 appdirs = ">=1.4.4"

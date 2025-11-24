@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
+from ..helper.multiformat_deserializable_mixin import MultiformatDeserializableMixin
 from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 
 
@@ -20,7 +23,7 @@ class OperationKind(str, Enum):
 
 
 @dataclass(slots=True)
-class ProvenanceEvent(MultiformatSerializableMixin):
+class ProvenanceEvent(MultiformatSerializableMixin, MultiformatDeserializableMixin):
     source: SourceKind
     operation: OperationKind
     details: dict[str, Any] = field(default_factory=dict)
@@ -32,12 +35,12 @@ class ProvenanceEvent(MultiformatSerializableMixin):
             "details": self.details,
         }
 
-    @staticmethod
-    def from_mapping(m: Mapping[str, Any]) -> "ProvenanceEvent":
-        details_obj = m.get("details") or {}
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any], **_: Any) -> ProvenanceEvent:
+        details_obj = mapping.get("details") or {}
         if not isinstance(details_obj, dict):
             raise TypeError(f"Expected 'details' to be a mapping, got {type(details_obj)!r}")
         return ProvenanceEvent(
-            source=SourceKind(m.get("source")),
-            operation=OperationKind(m.get("operation")),
+            source=SourceKind(mapping.get("source")),
+            operation=OperationKind(mapping.get("operation")),
             details=details_obj)

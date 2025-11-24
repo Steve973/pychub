@@ -5,20 +5,24 @@ import sys
 from argparse import Namespace
 from enum import Enum, auto
 from pathlib import Path
+from typing import Optional, Mapping, Any
 
 from appdirs import user_cache_dir
 
-from pychub.model.build_event import audit, BuildEvent, StageType, EventType
+from pychub.helper.toml_utils import load_toml_file
+from pychub.model.build_event import audit, BuildEvent, StageType, EventType, LevelType
 from pychub.model.chubproject_model import ChubProject
 from pychub.model.chubproject_provenance_model import SourceKind
+from pychub.model.compatibility_spec_model import CompatibilitySpec
 from pychub.package.constants import CHUBPROJECT_FILENAME
 from pychub.package.context_vars import current_build_plan
 from pychub.package.lifecycle.init import immediate_operations
+from pychub.package.lifecycle.plan.compatibility.compatibility_spec_loader import load_effective_compatibility_spec
 
 
 class ImmediateOutcome(Enum):
     """
-    Enumerates possible immediate outcomes for a process or action.
+    Lists possible immediate outcomes for a process or action.
 
     This class provides predefined constants that represent the immediate
     result or state of a process or action. It is used primarily to standardize
@@ -121,6 +125,70 @@ def cache_project(chubproject: ChubProject) -> Path:
     return project_staging_dir
 
 
+@audit(StageType.INIT, "load_compatibility_spec")
+def load_compatibility_spec(project_toml_path: Path | None) -> CompatibilitySpec:
+    """
+    Loads the compatibility specification from a given project TOML file, if present. The
+    function extracts settings such as the combination strategy, user-specified file, and
+    any inline overrides. If no project TOML file is provided, default values are used.
+
+    Args:
+        project_toml_path (Path | None): The file path to the project TOML file. Can be None.
+
+    Returns:
+        CompatibilitySpec: A compatibility specification combining inputs from the project
+        TOML file, specified user file, and inline overrides.
+
+    Raises:
+        ValueError: If the combination strategy specified in the TOML file is invalid.
+    """
+    build_plan = current_build_plan.get()
+    combine_strategy: str = "merge"
+    user_spec_path: Optional[Path] = None
+    inline_overrides: Optional[Mapping[str, Any]] = None
+
+    # Read the compatibility block from the project toml, if present
+    if project_toml_path is not None:
+        project_toml = load_toml_file(project_toml_path)
+        compat_block = (
+            project_toml
+            .get("tool", project_toml)
+            .get("pychub", project_toml)
+            .get("compatibility", {})
+        )
+
+        # Get the specified strategy or default to "merge"
+        raw_strategy = compat_block.pop("strategy", "merge")
+        if raw_strategy not in ("merge", "override"):
+            build_plan.audit_log.append(
+                BuildEvent.make(
+                    StageType.INIT,
+                    EventType.VALIDATION,
+                    LevelType.WARN,
+                    message=(
+                        f"CompatibilitySpec combination strategy '{raw_strategy}' must be "
+                        "'merge' or 'override'; defaulting to 'merge'.")))
+        else:
+            combine_strategy = raw_strategy
+
+        # A specified file has higher priority than the defaults
+        raw_file = compat_block.pop("file", None)
+        if isinstance(raw_file, str) and raw_file.strip():
+            candidate = Path(raw_file)
+            if not candidate.is_absolute():
+                candidate = project_toml_path.parent / candidate
+            user_spec_path = candidate
+
+        # The highest precedence is from inline overrides
+        override_mapping = dict(compat_block)
+        inline_overrides = override_mapping or None
+
+    return load_effective_compatibility_spec(
+        strategy_name=combine_strategy,
+        user_spec_path=user_spec_path,
+        inline_overrides=inline_overrides)
+
+
 @audit(StageType.INIT, "parse_chubproject")
 def process_chubproject(chubproject_path: Path) -> ChubProject:
     """
@@ -141,7 +209,7 @@ def process_chubproject(chubproject_path: Path) -> ChubProject:
     """
     if not chubproject_path.is_file():
         raise FileNotFoundError(f"Chub project file not found: {chubproject_path}")
-    return ChubProject.load_from_toml(chubproject_path)
+    return ChubProject.from_file(chubproject_path)
 
 
 @audit(StageType.INIT, "process_cli_options")
@@ -223,6 +291,7 @@ def init_project(chubproject_path: Path | None = None) -> tuple[Path, ImmediateO
     else:
         chubproject = process_options(args)
     build_plan.project = chubproject
+    build_plan.compatibility_spec = load_compatibility_spec(chubproject_path)
     project_cache_path = cache_project(chubproject)
     must_exit = check_immediate_operations(args, chubproject)
     return project_cache_path, must_exit

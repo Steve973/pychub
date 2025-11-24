@@ -9,6 +9,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any, Optional, ParamSpec, TypeVar
 
+from pychub.helper.multiformat_deserializable_mixin import MultiformatDeserializableMixin
 from pychub.helper.multiformat_serializable_mixin import MultiformatSerializableMixin
 from pychub.package.context_vars import current_build_plan
 
@@ -108,7 +109,7 @@ def audit(stage: StageType, substage: str | None = None) -> Callable[[Callable[P
 # --------------------------------------------------------------------------- #
 
 @dataclass(slots=True, frozen=True)
-class BuildEvent(MultiformatSerializableMixin):
+class BuildEvent(MultiformatSerializableMixin, MultiformatDeserializableMixin):
     """
     Immutable, context-aware audit event model.
 
@@ -177,21 +178,21 @@ class BuildEvent(MultiformatSerializableMixin):
             message=message,
             payload=frozen_payload)
 
-    @staticmethod
-    def from_mapping(m: dict[str, Any]) -> BuildEvent:
-        annotation_type = AnnotationType(m.get("annotation_type")) if m.get("annotation_type") else None
-        event_type = EventType(m.get("event_type", EventType.ACTION.value))
-        level = LevelType(m.get("level", LevelType.INFO.value))
-        stage = StageType(m.get("stage", StageType.LIFECYCLE.value))
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any], **_: Any) -> BuildEvent:
+        annotation_type = AnnotationType(mapping.get("annotation_type")) if mapping.get("annotation_type") else None
+        event_type = EventType(mapping.get("event_type", EventType.ACTION.value))
+        level = LevelType(mapping.get("level", LevelType.INFO.value))
+        stage = StageType(mapping.get("stage", StageType.LIFECYCLE.value))
 
         return BuildEvent(
             annotation_type=annotation_type,
-            event_id=m.get("event_id", str(uuid.uuid4())),
+            event_id=mapping.get("event_id", str(uuid.uuid4())),
             event_type=event_type,
             level=level,
-            message=m.get("message"),
-            payload=m.get("payload"),
+            message=mapping.get("message"),
+            payload=mapping.get("payload"),
             stage=stage,
-            substage=m.get("substage"),
+            substage=mapping.get("substage"),
             timestamp=datetime.datetime.fromisoformat(
-                m.get("timestamp", datetime.datetime.now(datetime.timezone.utc).isoformat())))
+                mapping.get("timestamp", datetime.datetime.now(datetime.timezone.utc).isoformat())))

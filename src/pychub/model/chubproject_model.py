@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Any, Optional, Mapping
 
 from .chubproject_provenance_model import ProvenanceEvent, SourceKind, OperationKind
+from ..helper.multiformat_deserializable_mixin import MultiformatDeserializableMixin
 from ..helper.multiformat_serializable_mixin import MultiformatSerializableMixin
-from ..helper.toml_utils import load_toml_text, dump_toml_to_str
+from ..helper.toml_utils import dump_toml_to_str
 
 
 def _normalize_str_list(value: Any) -> list[str]:
@@ -157,7 +158,7 @@ class ChubProjectError(Exception):
 
 
 @dataclass(slots=True)
-class ChubProject(MultiformatSerializableMixin):
+class ChubProject(MultiformatSerializableMixin, MultiformatDeserializableMixin):
     # identity / general
     name: Optional[str] = None
     version: Optional[str] = None
@@ -188,13 +189,32 @@ class ChubProject(MultiformatSerializableMixin):
     provenance: list[ProvenanceEvent] = field(default_factory=list)
 
     @classmethod
+    def _preprocess_mapping(
+        cls,
+        mapping: Mapping[str, Any],
+        *,
+        fmt: str,
+        path: Path | None,
+        **_: Any) -> Mapping[str, Any]:
+        if fmt != "toml":
+            return mapping
+
+        toml_name = path.name if path is not None else None
+        package_mapping = _select_package_table(mapping, toml_name)
+        if package_mapping is None:
+            # Keep existing behavior: fail if no pychub config was found.
+            raise ChubProjectError(f"No pychub config found in {path or '<inline TOML>'}")
+        return package_mapping
+
+    @classmethod
     def from_mapping(
             cls,
-            data: Mapping[str, Any] | None,
+            mapping: Mapping[str, Any],
             *,
             source: Optional[SourceKind] = None,
-            details: Optional[dict[str, Any]] = None) -> ChubProject:
-        data = data or {}
+            details: Optional[dict[str, Any]] = None,
+            **_: Any) -> ChubProject:
+        data = mapping or {}
 
         inst = cls(
             # scalars
@@ -217,17 +237,14 @@ class ChubProject(MultiformatSerializableMixin):
             post_scripts=_normalize_str_list(data.get("post_scripts") or (data.get("scripts") or {}).get("post")),
 
             # metadata
-            metadata=_normalize_metadata(data.get("metadata")),
-        )
+            metadata=_normalize_metadata(data.get("metadata")))
 
         if source is not None:
             inst.provenance.append(
                 ProvenanceEvent(
                     source=source,
                     operation=OperationKind.INIT,
-                    details=details or {},
-                )
-            )
+                    details=details or {}))
 
         return inst
 
@@ -250,7 +267,7 @@ class ChubProject(MultiformatSerializableMixin):
             "verbose",
             "analyze_compatibility",
             "table",
-            "show_version",
+            "show_version"
         )
         for field_name in scalar_fields:
             if field_name in data:
@@ -275,7 +292,7 @@ class ChubProject(MultiformatSerializableMixin):
             "wheels",
             "entrypoint_args",
             "includes",
-            "include_chubs",
+            "include_chubs"
         )
         for prop in list_fields:
             _merge_list(prop)
@@ -404,24 +421,6 @@ class ChubProject(MultiformatSerializableMixin):
                 "post": list(self.post_scripts),
             },
         }
-
-    @staticmethod
-    def load_from_toml(
-            path: Path,
-            *,
-            source: SourceKind = SourceKind.FILE) -> ChubProject:
-        """
-        Read TOML from `path`, use existing table-selection logic to find the
-        packaging config mapping, and build a ChubProject from it.
-        """
-        doc = load_toml_text(path.read_text(encoding="utf-8"))
-        package_mapping = _select_package_table(doc, path.name)
-        if package_mapping is None:
-            raise ChubProjectError(f"No pychub config found in {path}")
-        return ChubProject.from_mapping(
-            package_mapping,
-            source=source,
-            details={"file": str(path)})
 
     @staticmethod
     def cli_to_mapping(args: Namespace) -> dict[str, object]:

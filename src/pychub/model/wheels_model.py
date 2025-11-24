@@ -9,12 +9,10 @@ from typing import Any, Iterable, Iterator, Mapping
 
 from packaging.requirements import Requirement
 from packaging.tags import Tag
-from packaging.tags import parse_tag
 from packaging.utils import parse_wheel_filename
 from packaging.version import Version
 
 from pychub.helper.multiformat_serializable_mixin import MultiformatSerializableMixin
-from .wheelinfo_model import WheelInfo
 
 UNORDERED: int = 1_000_000
 
@@ -111,44 +109,6 @@ class WheelArtifact(MultiformatSerializableMixin):
             order=order,
             hash=wheel_hash,
             metadata=metadata)
-
-    @classmethod
-    def from_wheel_info(
-            cls,
-            info: WheelInfo,
-            *,
-            is_primary: bool = False,
-            source: WheelSourceType | str = WheelSourceType.PATH,
-            order: int = UNORDERED) -> "WheelArtifact":
-        """
-        Build a WheelArtifact directly from a pre-parsed WheelInfo.
-        This bypasses ZIP parsing when the wheel's metadata has already been
-        extracted and normalized by WheelInfo.build_from_wheel().
-        """
-        path = Path(info.filename)
-        version = Version(info.version)
-        tags = set().union(*(parse_tag(t) for t in info.tags))
-        wheel_source = source if isinstance(source, WheelSourceType) else WheelSourceType(source)
-        wheel_role = WheelRoleType.PRIMARY if is_primary else WheelRoleType.DEPENDENCY
-
-        # The 'requires_dist' lines from WheelInfo.meta contain dependency specs.
-        # Fall back to the "extras" mapping if none are found.
-        requires = list(info.meta.get("requires_dist", []))
-        if not requires and info.extras:
-            for reqs in info.extras.extras.values():
-                requires.extend(reqs)
-
-        return cls(
-            path=path,
-            name=info.name.lower().replace("_", "-"),
-            version=version,
-            tags=tags,
-            requires=requires,
-            source=wheel_source,
-            role=wheel_role,
-            order=order,
-            hash=info.sha256,
-            metadata=info.meta)
 
     # -------------------------------------------------------------------------
     # Helpers

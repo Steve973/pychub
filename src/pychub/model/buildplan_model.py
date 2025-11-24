@@ -11,6 +11,7 @@ from appdirs import user_cache_dir
 
 from pychub.model.chubproject_model import ChubProject
 from .build_event import BuildEvent
+from .compatibility_spec_model import CompatibilitySpec
 from .includes_model import Includes
 from .scripts_model import Scripts
 from .wheels_model import WheelCollection
@@ -33,14 +34,14 @@ class BuildPlan(MultiformatSerializableMixin):
     audit_log: list[BuildEvent] = field(default_factory=list)
     # Path to the top-level pychub staging/cache directory
     cache_root: Path = field(default_factory=Path)
+    # Compatibility specification (for determining relevant tag triples) for the build
+    compatibility_spec: CompatibilitySpec = field(default_factory=CompatibilitySpec)
     # When the build plan was created
     created_at: datetime.datetime = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     # Included files to be staged in the build
     include_files: Includes = field(default_factory=Includes)
     # Scripts to be staged in the build
     install_scripts: Scripts = field(default_factory=Scripts)
-    # Wheels to be staged in the build
-    wheels: WheelCollection = field(default_factory=WheelCollection)
     # Additional metadata for the build
     metadata: dict[str, Any] = field(default_factory=dict)
     # The ChubProject definition
@@ -51,28 +52,31 @@ class BuildPlan(MultiformatSerializableMixin):
     project_hash: str = field(default="")
     # The version of pychub that created this plan
     pychub_version: str = field(default_factory=lambda: get_version("pychub"))
+    # Wheels to be staged in the build
+    wheels: WheelCollection = field(default_factory=WheelCollection)
 
     # ------------------------------------------------------------------ #
     # Construction helpers
     # ------------------------------------------------------------------ #
 
-    @staticmethod
-    def from_mapping(m: Mapping[str, Any]) -> BuildPlan:
-        project = ChubProject.from_mapping(m["project"]) if "project" in m else None
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any], **_: Any) -> BuildPlan:
+        project = ChubProject.from_mapping(mapping["project"]) if "project" in mapping else None
         if project is None:
             raise ValueError("BuildPlan requires a nested 'project' mapping")
 
         return BuildPlan(
-            audit_log=list(m.get("audit_log", [])),
-            cache_root=Path(m.get("cache_root", str(user_cache_dir("pychub")))),
+            audit_log=list(mapping.get("audit_log", [])),
+            cache_root=Path(mapping.get("cache_root", str(user_cache_dir("pychub")))),
+            compatibility_spec=CompatibilitySpec.from_mapping(mapping.get("compatibility_spec", {})),
             created_at=datetime.datetime.fromisoformat(
-                m.get("created_at", datetime.datetime.now(datetime.timezone.utc).isoformat())
+                mapping.get("created_at", datetime.datetime.now(datetime.timezone.utc).isoformat())
             ),
-            metadata=dict(m.get("metadata") or {}),
+            metadata=dict(mapping.get("metadata") or {}),
             project=project,
-            project_dir=Path(m.get("project_dir") or "."),
-            project_hash=m.get("project_hash", ""),
-            pychub_version=m.get("pychub_version", get_version("pychub")))
+            project_dir=Path(mapping.get("project_dir") or "."),
+            project_hash=mapping.get("project_hash", ""),
+            pychub_version=mapping.get("pychub_version", get_version("pychub")))
 
     @classmethod
     def from_yaml(cls, s: str) -> BuildPlan:
@@ -102,6 +106,7 @@ class BuildPlan(MultiformatSerializableMixin):
         core = {
             "audit_log": [e.to_mapping() for e in self.audit_log],
             "cache_root": str(self.cache_root),
+            "compatibility_spec": self.compatibility_spec.to_mapping(),
             "created_at": str(self.created_at.isoformat()),
             "metadata": dict(self.metadata),
             "project": self.project.to_mapping(),
@@ -134,6 +139,7 @@ class BuildPlan(MultiformatSerializableMixin):
         validations = {
             'audit_log': (list, 'audit_log list[BuildEvent]'),
             'cache_root': (Path, 'cache_root Path'),
+            'compatibility_spec': (CompatibilitySpec, 'compatibility_spec CompatibilitySpec'),
             'created_at': (datetime.datetime, 'created_at datetime'),
             'metadata': (dict, 'metadata dict'),
             'project': (ChubProject, 'ChubProject'),
